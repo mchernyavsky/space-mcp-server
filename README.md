@@ -1,5 +1,11 @@
 # Space MCP Server
 
+[![CI](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/ci.yml)
+[![Release](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/release.yml/badge.svg)](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/release.yml)
+![Java 21](https://img.shields.io/badge/java-21-007396)
+![Kotlin 2.3.20](https://img.shields.io/badge/kotlin-2.3.20-7F52FF)
+![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
+
 Kotlin MCP server for JetBrains Space code reviews and merge requests.
 
 ## Requirements
@@ -84,6 +90,16 @@ The runnable fat jar is created at:
 ```text
 build/libs/space-mcp-server-0.1.0-all.jar
 ```
+
+## GitHub Workflows
+
+- `CI` runs on every pull request and on pushes to `master` and `main`.
+- The CI job runs `./gradlew build`, which includes compilation, tests, and ktlint checks.
+- Every CI run uploads:
+  - the runnable fat jar artifact
+  - Gradle reports and test results
+- `Release` runs on pushed tags matching `v*` and can also be started manually with a tag input from the Actions UI.
+- Release runs build the server, publish a versioned fat jar plus `SHA256SUMS.txt` as workflow artifacts, and attach those files to the GitHub release.
 
 ## Run
 
