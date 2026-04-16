@@ -17,6 +17,7 @@ val ktorVersion = "3.4.2"
 val coroutinesVersion = "1.10.2"
 val serializationVersion = "1.11.0"
 val mcpVersion = "0.11.1"
+val kotlinLoggingVersion = "8.0.01"
 val slf4jVersion = "2.0.17"
 
 kotlin {
@@ -34,6 +35,7 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.github.oshai:kotlin-logging-jvm:$kotlinLoggingVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     implementation("org.slf4j:slf4j-simple:$slf4jVersion")
