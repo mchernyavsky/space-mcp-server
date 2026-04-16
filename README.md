@@ -12,7 +12,7 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
 
 - Java 21
 - Access to a JetBrains Space instance such as `https://jetbrains.team`
-- Either a Space OAuth application for `space_authorize` or a Space access token for env-based local auth
+- A Space access token for the recommended env-based local auth flow, or a Space OAuth application for `space_authorize`
 
 ## What It Supports
 
@@ -70,7 +70,11 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
          "args": [
            "-jar",
            "/path/to/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
-         ]
+         ],
+         "env": {
+           "SPACE_SERVER_URL": "https://jetbrains.team",
+           "SPACE_ACCESS_TOKEN": "your-token"
+         }
        }
      }
    }
@@ -79,8 +83,8 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
    If `java` is not Java 21 on your machine, use the absolute path to a Java 21 binary instead.
 
 3. Authenticate:
-   - set `SPACE_ACCESS_TOKEN` in the MCP host config for local non-interactive auth, or
-   - call `space_authorize` once to complete OAuth.
+   - Recommended: set `SPACE_SERVER_URL` and `SPACE_ACCESS_TOKEN` in the MCP host config for local non-interactive auth.
+   - Alternative: call `space_authorize` once to complete OAuth.
 
 4. Verify the integration with:
    - `space_auth_status`
@@ -124,33 +128,17 @@ The server uses stdio transport.
 
 The server supports two auth modes:
 
-- OAuth via the `space_authorize` MCP tool
 - direct bearer-token bootstrap via environment variables for local `stdio` clients
+- OAuth via the `space_authorize` MCP tool
 
-### OAuth
+### Environment Variables (Recommended)
 
-Use the `space_authorize` MCP tool with:
+This is the default and recommended authorization flow for local MCP clients.
 
-- `clientId`
-- optional `clientSecret`
-- optional `serverUrl` (defaults to `https://jetbrains.team`)
-- optional `scope` (defaults to `**`)
-- optional `redirectUri`
-
-Default redirect URI:
-
-```text
-http://localhost:63363/api/space/oauth/authorization_code
-```
-
-For a normal Space application, configure the exact same redirect URI in the Space app settings.
-
-### Environment Variables
-
-If your MCP host can pass environment variables to a local server process, you can skip the interactive OAuth tool and bootstrap auth directly with:
+Set these environment variables in the MCP host configuration:
 
 - `SPACE_ACCESS_TOKEN`
-- optional `SPACE_SERVER_URL` (defaults to `https://jetbrains.team`)
+- `SPACE_SERVER_URL` for your Space organization URL, for example `https://jetbrains.team`
 - optional `SPACE_API_BASE_URL` (defaults to `<SPACE_SERVER_URL>/api/http`)
 - optional `SPACE_SCOPE`
 - optional `SPACE_CLIENT_ID`
@@ -177,10 +165,30 @@ Example local MCP config:
 }
 ```
 
-Stored credentials are written to:
+When you use OAuth, stored credentials are written to:
 
 - `$XDG_CONFIG_HOME/space-mcp-server/credentials.json`, or
 - `~/.config/space-mcp-server/credentials.json`
+
+### OAuth
+
+OAuth is available as a secondary flow when you do not want to pass a Space access token directly through the MCP host configuration.
+
+Use the `space_authorize` MCP tool with:
+
+- `clientId`
+- optional `clientSecret`
+- optional `serverUrl` (defaults to `https://jetbrains.team`)
+- optional `scope` (defaults to `**`)
+- optional `redirectUri`
+
+Default redirect URI:
+
+```text
+http://localhost:63363/api/space/oauth/authorization_code
+```
+
+For a normal Space application, configure the exact same redirect URI in the Space app settings.
 
 ## Common Tool Flow
 
