@@ -36,6 +36,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     implementation("org.slf4j:slf4j-simple:$slf4jVersion")
+    testImplementation(kotlin("test"))
 }
 
 tasks.withType<Test>().configureEach {
