@@ -1,7 +1,6 @@
 package team.jetbrains.space.mcp
 
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalSerializationApi::class)

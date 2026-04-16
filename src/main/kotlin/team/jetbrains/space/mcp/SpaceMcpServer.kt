@@ -23,7 +23,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import team.jetbrains.space.mcp.space.SpaceApiClient
 import team.jetbrains.space.mcp.space.SpaceAuthService
