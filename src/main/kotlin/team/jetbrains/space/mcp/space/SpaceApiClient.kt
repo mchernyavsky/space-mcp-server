@@ -4,10 +4,12 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -37,12 +39,13 @@ class SpaceApiClient(
     }
 
     suspend fun getCurrentUser(): SpaceProfile {
-        val credentials = authorizedCredentials()
-        return get(
-            credentials = credentials,
-            path = listOf("team-directory", "profiles", "me"),
-            fields = "id,username,name(firstName,lastName)",
-        )
+        return withAuthorizedCredentials { credentials ->
+            get(
+                credentials = credentials,
+                path = listOf("team-directory", "profiles", "me"),
+                fields = "id,username,name(firstName,lastName)",
+            )
+        }
     }
 
     suspend fun listProjects(
@@ -50,17 +53,18 @@ class SpaceApiClient(
         limit: Int,
         offset: Int,
     ): BatchResponse<ProjectSummary> {
-        val credentials = authorizedCredentials()
-        return get(
-            credentials = credentials,
-            path = listOf("projects"),
-            query = mapOf(
-                "\$top" to limit.toString(),
-                "\$skip" to offset.toString(),
-                "term" to term,
-            ),
-            fields = "data(id,key,name,private),totalCount,next",
-        )
+        return withAuthorizedCredentials { credentials ->
+            get(
+                credentials = credentials,
+                path = listOf("projects"),
+                query = mapOf(
+                    "\$top" to limit.toString(),
+                    "\$skip" to offset.toString(),
+                    "term" to term,
+                ),
+                fields = "data(id,key,name,private),totalCount,next",
+            )
+        }
     }
 
     suspend fun listReviews(
@@ -77,25 +81,26 @@ class SpaceApiClient(
         limit: Int,
         offset: Int,
     ): BatchResponse<ReviewListItemResponse> {
-        val credentials = authorizedCredentials()
-        return get(
-            credentials = credentials,
-            path = listOf("projects", "key:$projectKey", "code-reviews"),
-            query = mapOf(
-                "\$top" to limit.toString(),
-                "\$skip" to offset.toString(),
-                "repository" to repository,
-                "state" to state,
-                "type" to type,
-                "text" to text,
-                "author" to author,
-                "reviewer" to reviewer,
-                "from" to from,
-                "to" to to,
-                "sort" to sort,
-            ),
-            fields = "data(review(className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale))),totalCount,hasMore,next",
-        )
+        return withAuthorizedCredentials { credentials ->
+            get(
+                credentials = credentials,
+                path = listOf("projects", "key:$projectKey", "code-reviews"),
+                query = reviewQuery(
+                    repository = repository,
+                    state = state,
+                    type = type,
+                    text = text,
+                    author = author,
+                    reviewer = reviewer,
+                    from = from,
+                    to = to,
+                    sort = sort,
+                    limit = limit,
+                    offset = offset,
+                ),
+                fields = REVIEW_LIST_FIELDS,
+            )
+        }
     }
 
     suspend fun listMyReviews(
@@ -112,27 +117,16 @@ class SpaceApiClient(
         maxProjects: Int,
         perProjectLimit: Int,
     ): MyReviewsResponse {
-        val targetProjects = if (projectKey != null) {
-            BatchResponse(
-                data = listOf(ProjectSummary(id = projectKey, key = projectKey, name = projectKey)),
-                totalCount = 1,
-            )
-        } else {
-            listProjects(
-                term = null,
-                limit = maxProjects.coerceAtLeast(1),
-                offset = 0,
-            )
-        }
-
-        val filters = roleFilters(role)
+        val targetProjects = loadTargetProjects(projectKey, maxProjects)
         val aggregated = linkedMapOf<String, MutableCrossProjectReview>()
         var scannedProjects = 0
+        val reviewFilters = roleFilters(role)
+        val perProjectReviewLimit = perProjectLimit.coerceAtLeast(1)
 
         projectLoop@ for (project in targetProjects.data) {
             scannedProjects += 1
 
-            for (filter in filters) {
+            for (filter in reviewFilters) {
                 val batch = listReviews(
                     projectKey = project.key,
                     repository = repository,
@@ -144,24 +138,10 @@ class SpaceApiClient(
                     from = from,
                     to = to,
                     sort = sort,
-                    limit = perProjectLimit.coerceAtLeast(1),
+                    limit = perProjectReviewLimit,
                     offset = 0,
                 )
-
-                for (item in batch.data) {
-                    val key = "${project.key}:${item.review.id}"
-                    val existing = aggregated[key]
-                    if (existing == null) {
-                        aggregated[key] = MutableCrossProjectReview(
-                            projectKey = project.key,
-                            projectName = project.name,
-                            matchedRoles = linkedSetOf(filter.matchedRole),
-                            review = item.review,
-                        )
-                    } else {
-                        existing.matchedRoles += filter.matchedRole
-                    }
-                }
+                mergeReviewBatch(aggregated, project, filter.matchedRole, batch)
             }
 
             if (aggregated.size >= limit) {
@@ -169,24 +149,12 @@ class SpaceApiClient(
             }
         }
 
-        val reviews = aggregated.values
-            .sortedByDescending { it.review.timestamp ?: it.review.createdAt ?: Long.MIN_VALUE }
-            .take(limit.coerceAtLeast(1))
-            .map {
-                CrossProjectReview(
-                    projectKey = it.projectKey,
-                    projectName = it.projectName,
-                    matchedRoles = it.matchedRoles.toList(),
-                    review = it.review,
-                )
-            }
-
-        val totalCount = targetProjects.totalCount ?: targetProjects.data.size
-        return MyReviewsResponse(
-            reviews = reviews,
+        return buildMyReviewsResponse(
+            aggregated = aggregated,
+            totalProjects = targetProjects.totalCount ?: targetProjects.data.size,
             scannedProjects = scannedProjects,
-            projectScanTruncated = projectKey == null && totalCount > scannedProjects,
-            requestedLimit = limit,
+            projectScoped = projectKey != null,
+            limit = limit,
         )
     }
 
@@ -199,37 +167,24 @@ class SpaceApiClient(
         feedBatchSize: Int,
         feedBatchLimit: Int,
     ): ReviewDetailsBundle {
-        val credentials = authorizedCredentials()
-        val reviewIdentifier = normalizeReviewIdentifier(reviewRef)
-
-        val review = get<ReviewSummary>(
-            credentials = credentials,
-            path = listOf("projects", "key:$projectKey", "code-reviews", reviewIdentifier),
-            fields = "className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale)",
-        )
-
-        val commits = if (includeCommits) {
-            get<ReviewDetailsResponse>(
-                credentials = credentials,
-                path = listOf("projects", "key:$projectKey", "code-reviews", reviewIdentifier, "details"),
-            ).commits
-        } else {
-            emptyList()
+        return withAuthorizedCredentials { credentials ->
+            val review = fetchReviewSummary(credentials, projectKey, reviewRef)
+            ReviewDetailsBundle(
+                review = review,
+                commits = if (includeCommits) fetchReviewCommits(credentials, projectKey, reviewRef) else emptyList(),
+                comments = if (includeComments) {
+                    loadComments(
+                        credentials = credentials,
+                        feedChannelId = requireFeedChannelId(review),
+                        discussionReplyLimit = discussionReplyLimit,
+                        feedBatchSize = feedBatchSize,
+                        feedBatchLimit = feedBatchLimit,
+                    )
+                } else {
+                    null
+                },
+            )
         }
-
-        val comments = if (includeComments) {
-            val feedChannelId = review.feedChannelId
-                ?: throw IllegalStateException("Review ${review.number} has no feed channel id.")
-            loadComments(credentials, feedChannelId, discussionReplyLimit, feedBatchSize, feedBatchLimit)
-        } else {
-            null
-        }
-
-        return ReviewDetailsBundle(
-            review = review,
-            commits = commits,
-            comments = comments,
-        )
     }
 
     suspend fun postReviewComment(
@@ -238,21 +193,14 @@ class SpaceApiClient(
         text: String,
         pending: Boolean,
     ): SentMessageResult {
-        val credentials = authorizedCredentials()
-        val review = getReview(
-            projectKey = projectKey,
-            reviewRef = reviewRef,
-            includeCommits = false,
-            includeComments = false,
-            discussionReplyLimit = 0,
-            feedBatchSize = 0,
-            feedBatchLimit = 0,
-        ).review
-
-        val channelId = review.feedChannelId
-            ?: throw IllegalStateException("Review ${review.number} has no feed channel id.")
-
-        return sendChannelMessage(credentials, channelId, text, pending)
+        return withAuthorizedCredentials { credentials ->
+            sendChannelMessage(
+                credentials = credentials,
+                channelId = fetchReviewFeedChannelId(credentials, projectKey, reviewRef),
+                text = text,
+                pending = pending,
+            )
+        }
     }
 
     suspend fun createCodeDiscussion(
@@ -268,39 +216,32 @@ class SpaceApiClient(
         text: String,
         pending: Boolean,
     ): DiscussionCreationResult {
-        val credentials = authorizedCredentials()
-        val response = postJson<GenericApiRecord>(
-            credentials = credentials,
-            path = listOf("projects", "key:$projectKey", "code-reviews", "code-discussions"),
-            body = buildJsonObject {
-                put("text", JsonPrimitive(text))
-                put("repository", JsonPrimitive(repository))
-                put("reviewId", JsonPrimitive(normalizeReviewIdentifier(reviewRef)))
-                put("pending", JsonPrimitive(pending))
-                putJsonObject("anchor") {
-                    put("revision", JsonPrimitive(revision))
-                    put("filename", JsonPrimitive(filename))
-                    line?.let { put("line", JsonPrimitive(it)) }
-                    oldLine?.let { put("oldLine", JsonPrimitive(it)) }
-                }
-                if (endLine != null || endOldLine != null) {
-                    putJsonObject("endAnchor") {
-                        put("revision", JsonPrimitive(revision))
-                        put("filename", JsonPrimitive(filename))
-                        endLine?.let { put("line", JsonPrimitive(it)) }
-                        endOldLine?.let { put("oldLine", JsonPrimitive(it)) }
-                    }
-                }
-            }
-        )
+        return withAuthorizedCredentials { credentials ->
+            val response = postJson<GenericApiRecord>(
+                credentials = credentials,
+                path = listOf("projects", "key:$projectKey", "code-reviews", "code-discussions"),
+                body = createDiscussionRequestBody(
+                    reviewRef = reviewRef,
+                    repository = repository,
+                    revision = revision,
+                    filename = filename,
+                    line = line,
+                    oldLine = oldLine,
+                    endLine = endLine,
+                    endOldLine = endOldLine,
+                    text = text,
+                    pending = pending,
+                ),
+            )
 
-        return DiscussionCreationResult(
-            id = response.id,
-            channelId = response.channel?.id ?: throw IllegalStateException("Discussion channel id is missing from response."),
-            pending = response.pending,
-            feedItemId = response.feedItemId,
-            anchor = response.anchor,
-        )
+            DiscussionCreationResult(
+                id = response.id,
+                channelId = response.channel?.id ?: throw IllegalStateException("Discussion channel id is missing from response."),
+                pending = response.pending,
+                feedItemId = response.feedItemId,
+                anchor = response.anchor,
+            )
+        }
     }
 
     suspend fun replyToDiscussion(
@@ -308,8 +249,9 @@ class SpaceApiClient(
         text: String,
         pending: Boolean,
     ): SentMessageResult {
-        val credentials = authorizedCredentials()
-        return sendChannelMessage(credentials, channelId, text, pending)
+        return withAuthorizedCredentials { credentials ->
+            sendChannelMessage(credentials, channelId, text, pending)
+        }
     }
 
     private suspend fun loadComments(
@@ -435,32 +377,10 @@ class SpaceApiClient(
         query: Map<String, String?> = emptyMap(),
         fields: String? = null,
     ): T {
-        val client = httpClient()
-        client.use {
-            val url = URLBuilder(credentials.apiBaseUrl).apply {
-                appendPathSegments(*path.toTypedArray())
-                query.forEach { (key, value) ->
-                    if (!value.isNullOrBlank()) parameters.append(key, value)
-                }
-                if (!fields.isNullOrBlank()) {
-                    parameters.append("\$fields", fields)
-                }
-            }.buildString()
-
-            val response = client.get(url) {
-                header(HttpHeaders.Authorization, "Bearer ${credentials.accessToken}")
+        return requestJson(credentials, path, query, fields) { url ->
+            get(url) {
+                authorize(credentials)
                 header(HttpHeaders.Accept, ContentType.Application.Json)
-            }
-
-            val bodyText = response.bodyAsText()
-            if (!response.status.isSuccess()) {
-                throw IllegalStateException("Space API request failed: ${response.status.value} $bodyText")
-            }
-
-            return try {
-                json.decodeFromString(bodyText)
-            } catch (e: SerializationException) {
-                throw IllegalStateException("Failed to parse Space API response for $url: ${e.message}\n$bodyText", e)
             }
         }
     }
@@ -470,27 +390,11 @@ class SpaceApiClient(
         path: List<String>,
         body: JsonObject,
     ): T {
-        val client = httpClient()
-        client.use {
-            val url = URLBuilder(credentials.apiBaseUrl).apply {
-                appendPathSegments(*path.toTypedArray())
-            }.buildString()
-
-            val response = client.post(url) {
-                header(HttpHeaders.Authorization, "Bearer ${credentials.accessToken}")
+        return requestJson(credentials, path) { url ->
+            post(url) {
+                authorize(credentials)
                 contentType(ContentType.Application.Json)
                 setBody(body)
-            }
-
-            val bodyText = response.bodyAsText()
-            if (!response.status.isSuccess()) {
-                throw IllegalStateException("Space API request failed: ${response.status.value} $bodyText")
-            }
-
-            return try {
-                json.decodeFromString(bodyText)
-            } catch (e: SerializationException) {
-                throw IllegalStateException("Failed to parse Space API response for $url: ${e.message}\n$bodyText", e)
             }
         }
     }
@@ -525,6 +429,200 @@ class SpaceApiClient(
         val refreshed = refreshAccessToken(stored)
         credentialStore.save(refreshed)
         return refreshed
+    }
+
+    private suspend inline fun <T> withAuthorizedCredentials(crossinline block: suspend (StoredCredentials) -> T): T {
+        return block(authorizedCredentials())
+    }
+
+    private suspend fun loadTargetProjects(projectKey: String?, maxProjects: Int): BatchResponse<ProjectSummary> {
+        return if (projectKey != null) {
+            singleProjectBatch(projectKey)
+        } else {
+            listProjects(
+                term = null,
+                limit = maxProjects.coerceAtLeast(1),
+                offset = 0,
+            )
+        }
+    }
+
+    private fun singleProjectBatch(projectKey: String): BatchResponse<ProjectSummary> {
+        return BatchResponse(
+            data = listOf(ProjectSummary(id = projectKey, key = projectKey, name = projectKey)),
+            totalCount = 1,
+        )
+    }
+
+    private fun mergeReviewBatch(
+        aggregated: LinkedHashMap<String, MutableCrossProjectReview>,
+        project: ProjectSummary,
+        matchedRole: String,
+        batch: BatchResponse<ReviewListItemResponse>,
+    ) {
+        for (item in batch.data) {
+            val key = "${project.key}:${item.review.id}"
+            val existing = aggregated[key]
+            if (existing == null) {
+                aggregated[key] = MutableCrossProjectReview(
+                    projectKey = project.key,
+                    projectName = project.name,
+                    matchedRoles = linkedSetOf(matchedRole),
+                    review = item.review,
+                )
+            } else {
+                existing.matchedRoles += matchedRole
+            }
+        }
+    }
+
+    private fun buildMyReviewsResponse(
+        aggregated: Map<String, MutableCrossProjectReview>,
+        totalProjects: Int,
+        scannedProjects: Int,
+        projectScoped: Boolean,
+        limit: Int,
+    ): MyReviewsResponse {
+        val reviews = aggregated.values
+            .sortedByDescending { it.review.timestamp ?: it.review.createdAt ?: Long.MIN_VALUE }
+            .take(limit.coerceAtLeast(1))
+            .map {
+                CrossProjectReview(
+                    projectKey = it.projectKey,
+                    projectName = it.projectName,
+                    matchedRoles = it.matchedRoles.toList(),
+                    review = it.review,
+                )
+            }
+
+        return MyReviewsResponse(
+            reviews = reviews,
+            scannedProjects = scannedProjects,
+            projectScanTruncated = !projectScoped && totalProjects > scannedProjects,
+            requestedLimit = limit,
+        )
+    }
+
+    private suspend fun fetchReviewSummary(
+        credentials: StoredCredentials,
+        projectKey: String,
+        reviewRef: String,
+    ): ReviewSummary {
+        return get(
+            credentials = credentials,
+            path = listOf("projects", "key:$projectKey", "code-reviews", normalizeReviewIdentifier(reviewRef)),
+            fields = REVIEW_SUMMARY_FIELDS,
+        )
+    }
+
+    private suspend fun fetchReviewCommits(
+        credentials: StoredCredentials,
+        projectKey: String,
+        reviewRef: String,
+    ): List<ReviewCommitInReview> {
+        return get<ReviewDetailsResponse>(
+            credentials = credentials,
+            path = listOf("projects", "key:$projectKey", "code-reviews", normalizeReviewIdentifier(reviewRef), "details"),
+        ).commits
+    }
+
+    private suspend fun fetchReviewFeedChannelId(
+        credentials: StoredCredentials,
+        projectKey: String,
+        reviewRef: String,
+    ): String {
+        return requireFeedChannelId(fetchReviewSummary(credentials, projectKey, reviewRef))
+    }
+
+    private fun requireFeedChannelId(review: ReviewSummary): String {
+        return review.feedChannelId
+            ?: throw IllegalStateException("Review ${review.number} has no feed channel id.")
+    }
+
+    private fun createDiscussionRequestBody(
+        reviewRef: String,
+        repository: String,
+        revision: String,
+        filename: String,
+        line: Int?,
+        oldLine: Int?,
+        endLine: Int?,
+        endOldLine: Int?,
+        text: String,
+        pending: Boolean,
+    ): JsonObject {
+        return buildJsonObject {
+            put("text", JsonPrimitive(text))
+            put("repository", JsonPrimitive(repository))
+            put("reviewId", JsonPrimitive(normalizeReviewIdentifier(reviewRef)))
+            put("pending", JsonPrimitive(pending))
+            put("anchor", buildAnchor(revision, filename, line, oldLine))
+            if (endLine != null || endOldLine != null) {
+                put("endAnchor", buildAnchor(revision, filename, endLine, endOldLine))
+            }
+        }
+    }
+
+    private fun buildAnchor(
+        revision: String,
+        filename: String,
+        line: Int?,
+        oldLine: Int?,
+    ): JsonObject {
+        return buildJsonObject {
+            put("revision", JsonPrimitive(revision))
+            put("filename", JsonPrimitive(filename))
+            line?.let { put("line", JsonPrimitive(it)) }
+            oldLine?.let { put("oldLine", JsonPrimitive(it)) }
+        }
+    }
+
+    private suspend inline fun <reified T> requestJson(
+        credentials: StoredCredentials,
+        path: List<String>,
+        query: Map<String, String?> = emptyMap(),
+        fields: String? = null,
+        request: HttpClient.(String) -> HttpResponse,
+    ): T {
+        val client = httpClient()
+        client.use {
+            val url = buildApiUrl(credentials.apiBaseUrl, path, query, fields)
+            return decodeResponse(url, client.request(url))
+        }
+    }
+
+    private fun buildApiUrl(
+        apiBaseUrl: String,
+        path: List<String>,
+        query: Map<String, String?>,
+        fields: String?,
+    ): String {
+        return URLBuilder(apiBaseUrl).apply {
+            appendPathSegments(*path.toTypedArray())
+            query.forEach { (key, value) ->
+                if (!value.isNullOrBlank()) parameters.append(key, value)
+            }
+            if (!fields.isNullOrBlank()) {
+                parameters.append("\$fields", fields)
+            }
+        }.buildString()
+    }
+
+    private suspend inline fun <reified T> decodeResponse(url: String, response: HttpResponse): T {
+        val bodyText = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Space API request failed: ${response.status.value} $bodyText")
+        }
+
+        return try {
+            json.decodeFromString(bodyText)
+        } catch (e: SerializationException) {
+            throw IllegalStateException("Failed to parse Space API response for $url: ${e.message}\n$bodyText", e)
+        }
+    }
+
+    private fun HttpRequestBuilder.authorize(credentials: StoredCredentials) {
+        header(HttpHeaders.Authorization, "Bearer ${credentials.accessToken}")
     }
 
     private fun normalizeReviewIdentifier(reviewRef: String): String {
@@ -569,6 +667,41 @@ class SpaceApiClient(
                 ),
             )
         }
+    }
+
+    private fun reviewQuery(
+        repository: String?,
+        state: String?,
+        type: String?,
+        text: String?,
+        author: String?,
+        reviewer: String?,
+        from: String?,
+        to: String?,
+        sort: String,
+        limit: Int,
+        offset: Int,
+    ): Map<String, String?> {
+        return mapOf(
+            "\$top" to limit.toString(),
+            "\$skip" to offset.toString(),
+            "repository" to repository,
+            "state" to state,
+            "type" to type,
+            "text" to text,
+            "author" to author,
+            "reviewer" to reviewer,
+            "from" to from,
+            "to" to to,
+            "sort" to sort,
+        )
+    }
+
+    private companion object {
+        const val REVIEW_LIST_FIELDS =
+            "data(review(className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale))),totalCount,hasMore,next"
+        const val REVIEW_SUMMARY_FIELDS =
+            "className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale)"
     }
 }
 
