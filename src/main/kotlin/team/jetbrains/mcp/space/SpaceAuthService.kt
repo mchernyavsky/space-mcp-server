@@ -1,4 +1,4 @@
-package team.jetbrains.space.mcp.space
+package team.jetbrains.mcp.space
 
 import com.sun.net.httpserver.HttpServer
 import io.ktor.client.HttpClient

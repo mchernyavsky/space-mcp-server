@@ -23,17 +23,17 @@ Keep the implementation focused on:
 
 ## Project Layout
 
-- `src/main/kotlin/team/jetbrains/space/mcp/Main.kt`
+- `src/main/kotlin/team/jetbrains/mcp/Main.kt`
   - JVM entry point
-- `src/main/kotlin/team/jetbrains/space/mcp/SpaceMcpServer.kt`
+- `src/main/kotlin/team/jetbrains/mcp/SpaceMcpServer.kt`
   - MCP server wiring and tool registration
-- `src/main/kotlin/team/jetbrains/space/mcp/space/SpaceAuthService.kt`
+- `src/main/kotlin/team/jetbrains/mcp/space/SpaceAuthService.kt`
   - OAuth code flow, PKCE, token exchange, refresh
-- `src/main/kotlin/team/jetbrains/space/mcp/space/SpaceApiClient.kt`
+- `src/main/kotlin/team/jetbrains/mcp/space/SpaceApiClient.kt`
   - Raw Space HTTP client and review/chat operations
-- `src/main/kotlin/team/jetbrains/space/mcp/space/Models.kt`
+- `src/main/kotlin/team/jetbrains/mcp/space/Models.kt`
   - DTOs for MCP responses and Space payloads
-- `src/main/kotlin/team/jetbrains/space/mcp/space/SpaceCredentialStore.kt`
+- `src/main/kotlin/team/jetbrains/mcp/space/SpaceCredentialStore.kt`
   - Local credential persistence
 
 ## Build And Validation

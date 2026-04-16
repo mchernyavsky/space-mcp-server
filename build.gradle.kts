@@ -23,7 +23,7 @@ kotlin {
 }
 
 application {
-    mainClass = "team.jetbrains.space.mcp.MainKt"
+    mainClass = "team.jetbrains.mcp.MainKt"
 }
 
 dependencies {

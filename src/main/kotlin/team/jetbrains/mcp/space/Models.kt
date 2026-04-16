@@ -1,4 +1,4 @@
-package team.jetbrains.space.mcp.space
+package team.jetbrains.mcp.space
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.ExperimentalSerializationApi

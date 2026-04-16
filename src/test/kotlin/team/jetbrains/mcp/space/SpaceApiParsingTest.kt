@@ -1,6 +1,5 @@
-package team.jetbrains.space.mcp.space
+package team.jetbrains.mcp.space
 
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals

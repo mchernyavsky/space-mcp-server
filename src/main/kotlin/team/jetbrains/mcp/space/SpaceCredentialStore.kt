@@ -1,4 +1,4 @@
-package team.jetbrains.space.mcp.space
+package team.jetbrains.mcp.space
 
 import kotlinx.serialization.json.Json
 import java.nio.file.Files

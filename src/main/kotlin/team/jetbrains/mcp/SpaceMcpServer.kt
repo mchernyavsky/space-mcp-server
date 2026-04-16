@@ -1,4 +1,4 @@
-package team.jetbrains.space.mcp
+package team.jetbrains.mcp
 
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
@@ -24,9 +24,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.putJsonObject
-import team.jetbrains.space.mcp.space.SpaceApiClient
-import team.jetbrains.space.mcp.space.SpaceAuthService
-import team.jetbrains.space.mcp.space.SpaceCredentialStore
+import team.jetbrains.mcp.space.SpaceApiClient
+import team.jetbrains.mcp.space.SpaceAuthService
+import team.jetbrains.mcp.space.SpaceCredentialStore
 
 class SpaceMcpServer {
     private val jsonSupport = ToolJsonSupport()

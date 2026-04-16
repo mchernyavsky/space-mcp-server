@@ -1,4 +1,4 @@
-package team.jetbrains.space.mcp
+package team.jetbrains.mcp
 
 fun main() {
     disableKotlinLoggingStartupBanner()
