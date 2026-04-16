@@ -163,6 +163,20 @@ Check the current auth state:
 { "name": "space_auth_status", "arguments": {} }
 ```
 
+Example response:
+
+```json
+{
+  "configured": true,
+  "authenticated": true,
+  "serverUrl": "https://jetbrains.team",
+  "currentUser": {
+    "id": "3j5uoD3koYEa",
+    "username": "Mikhail.Chernyavsky"
+  }
+}
+```
+
 List your reviews:
 
 ```json
@@ -173,6 +187,29 @@ List your reviews:
     "role": "both",
     "limit": 20
   }
+}
+```
+
+Example response:
+
+```json
+{
+  "reviews": [
+    {
+      "projectKey": "FLEET",
+      "matchedRoles": ["reviewer"],
+      "review": {
+        "number": 7705,
+        "title": "[air] WIP AIR-4493 introduce tree-like changes structure",
+        "resolvedAuthor": {
+          "username": "Aleksandr.Chernokoz"
+        }
+      }
+    }
+  ],
+  "scannedProjects": 20,
+  "projectScanTruncated": true,
+  "requestedLimit": 20
 }
 ```
 
@@ -190,6 +227,46 @@ Fetch a review with commits and comments:
 }
 ```
 
+Example response excerpt:
+
+```json
+{
+  "review": {
+    "number": 7705,
+    "title": "[air] WIP AIR-4493 introduce tree-like changes structure",
+    "resolvedAuthor": {
+      "username": "Aleksandr.Chernokoz"
+    }
+  },
+  "commits": [
+    {
+      "repositoryInReview": {
+        "name": "ultimate"
+      },
+      "commits": [
+        {
+          "id": "9013469ed495a90305cb7b886b1b18c8548b09f7",
+          "author": {
+            "name": "Aleksandr Chernokoz"
+          }
+        }
+      ]
+    }
+  ],
+  "comments": {
+    "entries": [
+      {
+        "kind": "code-discussion",
+        "text": "Please rename this",
+        "author": {
+          "name": "Mikhail.Chernyavsky"
+        }
+      }
+    ]
+  }
+}
+```
+
 Filter review comments by author:
 
 ```json
@@ -200,6 +277,28 @@ Filter review comments by author:
     "review": "number:7705",
     "author": "Mikhail.Chernyavsky"
   }
+}
+```
+
+Example response:
+
+```json
+{
+  "authorFilter": "Mikhail.Chernyavsky",
+  "count": 2,
+  "comments": [
+    {
+      "kind": "review-feed",
+      "text": "Looks good"
+    },
+    {
+      "kind": "code-discussion",
+      "anchor": {
+        "filename": "src/Main.kt",
+        "line": 42
+      }
+    }
+  ]
 }
 ```
 
