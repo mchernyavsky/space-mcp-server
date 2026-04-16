@@ -8,14 +8,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SpaceApiParsingTest {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+        }
 
     @Test
     fun `project list accepts key objects`() {
-        val payload = """
+        val payload =
+            """
             {
               "next": "50",
               "totalCount": 2,
@@ -34,7 +36,7 @@ class SpaceApiParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val response = json.decodeFromString<BatchResponse<ProjectSummary>>(payload)
 
@@ -44,7 +46,8 @@ class SpaceApiParsingTest {
 
     @Test
     fun `review details accept partial short info and nested commits`() {
-        val payload = """
+        val payload =
+            """
             {
               "shortInfo": {
                 "className": "MergeRequestRecord",
@@ -73,7 +76,7 @@ class SpaceApiParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val response = json.decodeFromString<RawReviewDetailsResponse>(payload)
         val commits = response.normalizedCommits()
@@ -90,7 +93,8 @@ class SpaceApiParsingTest {
 
     @Test
     fun `review summary resolves author from createdBy`() {
-        val payload = """
+        val payload =
+            """
             {
               "className": "MergeRequestRecord",
               "id": "30meQG4eKA1u",
@@ -105,7 +109,7 @@ class SpaceApiParsingTest {
                 }
               }
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val response = json.decodeFromString<ReviewSummary>(payload).normalized()
 
@@ -115,7 +119,8 @@ class SpaceApiParsingTest {
 
     @Test
     fun `feed sync batch accepts top level author`() {
-        val payload = """
+        val payload =
+            """
             {
               "etag": "1669848753922",
               "data": [
@@ -144,7 +149,7 @@ class SpaceApiParsingTest {
               ],
               "hasMore": false
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val response = json.decodeFromString<SyncBatchResponse>(payload)
         val message = response.data.single().chatMessage

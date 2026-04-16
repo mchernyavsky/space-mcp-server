@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit
 class SpaceAuthService(
     private val credentialStore: SpaceCredentialStore,
 ) {
-
     suspend fun status(apiClient: SpaceApiClient): AuthStatus {
         val credentials = resolveConfiguredCredentials(credentialStore)
         if (credentials == null) {
@@ -58,111 +57,124 @@ class SpaceAuthService(
         redirectUri: String,
         openBrowser: Boolean,
         timeoutSeconds: Int,
-    ): OAuthAuthorizationResult = withContext(Dispatchers.IO) {
-        val normalizedServerUrl = serverUrl.trimEnd('/')
-        val callbackConfig = parseRedirectConfig(redirectUri)
+    ): OAuthAuthorizationResult =
+        withContext(Dispatchers.IO) {
+            val normalizedServerUrl = serverUrl.trimEnd('/')
+            val callbackConfig = parseRedirectConfig(redirectUri)
 
-        val redirectServer = HttpServer.create(
-            InetSocketAddress(callbackConfig.host, callbackConfig.port),
-            0,
-        )
-        redirectServer.executor = Executors.newSingleThreadExecutor()
+            val redirectServer =
+                HttpServer.create(
+                    InetSocketAddress(callbackConfig.host, callbackConfig.port),
+                    0,
+                )
+            redirectServer.executor = Executors.newSingleThreadExecutor()
 
-        val state = UUID.randomUUID().toString()
-        val codeVerifier = generateCodeVerifier()
-        val callback = CompletableFuture<AuthorizationCallback>()
+            val state = UUID.randomUUID().toString()
+            val codeVerifier = generateCodeVerifier()
+            val callback = CompletableFuture<AuthorizationCallback>()
 
-        redirectServer.createContext(callbackConfig.path) { exchange ->
-            val query = exchange.requestURI.rawQuery.orEmpty()
-            val parameters = parseQuery(query)
-            val callbackState = parameters["state"]
-            val error = parameters["error"]
-            val description = parameters["error_description"]
-            val code = parameters["code"]
+            redirectServer.createContext(callbackConfig.path) { exchange ->
+                val query = exchange.requestURI.rawQuery.orEmpty()
+                val parameters = parseQuery(query)
+                val callbackState = parameters["state"]
+                val error = parameters["error"]
+                val description = parameters["error_description"]
+                val code = parameters["code"]
 
-            val (statusCode, body) = when {
-                error != null -> {
-                    callback.completeExceptionally(IllegalStateException("Space authorization failed: $error ${description.orEmpty()}".trim()))
-                    400 to "<html><body><h2>Space authorization failed.</h2><p>${escapeHtml(description ?: error)}</p></body></html>"
-                }
-                callbackState != state -> {
-                    callback.completeExceptionally(IllegalStateException("Space authorization failed: state mismatch."))
-                    400 to "<html><body><h2>Space authorization failed.</h2><p>State mismatch.</p></body></html>"
-                }
-                code.isNullOrBlank() -> {
-                    callback.completeExceptionally(IllegalStateException("Space authorization failed: no authorization code returned."))
-                    400 to "<html><body><h2>Space authorization failed.</h2><p>No authorization code returned.</p></body></html>"
-                }
-                else -> {
-                    callback.complete(AuthorizationCallback(code))
-                    200 to "<html><body><h2>Space authorization complete.</h2><p>You can close this tab and return to the MCP client.</p></body></html>"
-                }
+                val (statusCode, body) =
+                    when {
+                        error != null -> {
+                            callback.completeExceptionally(
+                                IllegalStateException("Space authorization failed: $error ${description.orEmpty()}".trim()),
+                            )
+                            400 to
+                                "<html><body><h2>Space authorization failed.</h2><p>${escapeHtml(description ?: error)}</p></body></html>"
+                        }
+                        callbackState != state -> {
+                            callback.completeExceptionally(IllegalStateException("Space authorization failed: state mismatch."))
+                            400 to "<html><body><h2>Space authorization failed.</h2><p>State mismatch.</p></body></html>"
+                        }
+                        code.isNullOrBlank() -> {
+                            callback.completeExceptionally(
+                                IllegalStateException("Space authorization failed: no authorization code returned."),
+                            )
+                            400 to "<html><body><h2>Space authorization failed.</h2><p>No authorization code returned.</p></body></html>"
+                        }
+                        else -> {
+                            callback.complete(AuthorizationCallback(code))
+                            200 to
+                                "<html><body><h2>Space authorization complete.</h2><p>You can close this tab and return to the MCP client.</p></body></html>"
+                        }
+                    }
+
+                exchange.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
+                val bytes = body.toByteArray(StandardCharsets.UTF_8)
+                exchange.sendResponseHeaders(statusCode, bytes.size.toLong())
+                exchange.responseBody.use { it.write(bytes) }
+                exchange.close()
             }
 
-            exchange.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
-            val bytes = body.toByteArray(StandardCharsets.UTF_8)
-            exchange.sendResponseHeaders(statusCode, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-            exchange.close()
-        }
+            redirectServer.start()
+            val authUrl =
+                buildAuthorizationUrl(
+                    serverUrl = normalizedServerUrl,
+                    clientId = clientId,
+                    redirectUri = redirectUri,
+                    state = state,
+                    scope = scope,
+                    codeVerifier = codeVerifier,
+                )
 
-        redirectServer.start()
-        val authUrl = buildAuthorizationUrl(
-            serverUrl = normalizedServerUrl,
-            clientId = clientId,
-            redirectUri = redirectUri,
-            state = state,
-            scope = scope,
-            codeVerifier = codeVerifier,
-        )
+            if (openBrowser && Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(URI(authUrl))
+            }
 
-        if (openBrowser && Desktop.isDesktopSupported()) {
-            Desktop.getDesktop().browse(URI(authUrl))
-        }
+            val authorizationCode =
+                try {
+                    callback.get(timeoutSeconds.toLong(), TimeUnit.SECONDS).code
+                } finally {
+                    redirectServer.stop(0)
+                    (redirectServer.executor as? java.util.concurrent.ExecutorService)?.shutdownNow()
+                }
 
-        val authorizationCode = try {
-            callback.get(timeoutSeconds.toLong(), TimeUnit.SECONDS).code
-        } finally {
-            redirectServer.stop(0)
-            (redirectServer.executor as? java.util.concurrent.ExecutorService)?.shutdownNow()
-        }
+            val tokenInfo =
+                createAuthHttpClient().use { client ->
+                    exchangeCodeForTokens(
+                        client = client,
+                        serverUrl = normalizedServerUrl,
+                        clientId = clientId,
+                        clientSecret = clientSecret,
+                        authorizationCode = authorizationCode,
+                        redirectUri = redirectUri,
+                        codeVerifier = codeVerifier,
+                    )
+                }
 
-        val tokenInfo = createAuthHttpClient().use { client ->
-            exchangeCodeForTokens(
-                client = client,
-                serverUrl = normalizedServerUrl,
+            val expiresAt = tokenInfo.expiresIn?.let { Instant.now().plusSeconds(it.toLong()).epochSecond }
+            val stored =
+                StoredCredentials(
+                    serverUrl = normalizedServerUrl,
+                    apiBaseUrl = defaultApiBaseUrl(normalizedServerUrl),
+                    clientId = clientId,
+                    clientSecret = clientSecret,
+                    scope = scope,
+                    redirectUri = callbackConfig.uri.toString(),
+                    accessToken = tokenInfo.accessToken,
+                    refreshToken = tokenInfo.refreshToken,
+                    expiresAtEpochSeconds = expiresAt,
+                )
+            credentialStore.save(stored)
+
+            OAuthAuthorizationResult(
+                serverUrl = stored.serverUrl,
+                apiBaseUrl = stored.apiBaseUrl,
+                redirectUri = callbackConfig.uri.toString(),
+                scope = scope,
                 clientId = clientId,
-                clientSecret = clientSecret,
-                authorizationCode = authorizationCode,
-                redirectUri = redirectUri,
-                codeVerifier = codeVerifier,
+                hasClientSecret = clientSecret != null,
+                expiresAtEpochSeconds = expiresAt,
             )
         }
-
-        val expiresAt = tokenInfo.expiresIn?.let { Instant.now().plusSeconds(it.toLong()).epochSecond }
-        val stored = StoredCredentials(
-            serverUrl = normalizedServerUrl,
-            apiBaseUrl = defaultApiBaseUrl(normalizedServerUrl),
-            clientId = clientId,
-            clientSecret = clientSecret,
-            scope = scope,
-            redirectUri = callbackConfig.uri.toString(),
-            accessToken = tokenInfo.accessToken,
-            refreshToken = tokenInfo.refreshToken,
-            expiresAtEpochSeconds = expiresAt,
-        )
-        credentialStore.save(stored)
-
-        OAuthAuthorizationResult(
-            serverUrl = stored.serverUrl,
-            apiBaseUrl = stored.apiBaseUrl,
-            redirectUri = callbackConfig.uri.toString(),
-            scope = scope,
-            clientId = clientId,
-            hasClientSecret = clientSecret != null,
-            expiresAtEpochSeconds = expiresAt,
-        )
-    }
 
     companion object {
         const val DEFAULT_SERVER_URL = "https://jetbrains.team"
@@ -173,7 +185,9 @@ class SpaceAuthService(
     }
 }
 
-class AuthorizationRequiredException(message: String) : IllegalStateException(message)
+class AuthorizationRequiredException(
+    message: String,
+) : IllegalStateException(message)
 
 @Serializable
 private data class OAuthTokenResponse(
@@ -189,38 +203,41 @@ private data class AuthorizationCallback(
     val code: String,
 )
 
-internal fun createAuthHttpClient(): HttpClient {
-    return HttpClient(CIO) {
+internal fun createAuthHttpClient(): HttpClient =
+    HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
         expectSuccess = false
     }
-}
 
 internal suspend fun refreshAccessToken(credentials: StoredCredentials): StoredCredentials {
-    val refreshToken = credentials.refreshToken
-        ?: throw AuthorizationRequiredException("No refresh token is stored. Run the space_authorize tool again.")
-    val clientId = credentials.clientId
-        ?: throw AuthorizationRequiredException("No Space client ID is stored. Run the space_authorize tool again.")
+    val refreshToken =
+        credentials.refreshToken
+            ?: throw AuthorizationRequiredException("No refresh token is stored. Run the space_authorize tool again.")
+    val clientId =
+        credentials.clientId
+            ?: throw AuthorizationRequiredException("No Space client ID is stored. Run the space_authorize tool again.")
 
-    val tokenInfo = createAuthHttpClient().use { client ->
-        try {
-            requestOAuthToken(
-                client = client,
-                serverUrl = credentials.serverUrl,
-                clientId = clientId,
-                clientSecret = credentials.clientSecret,
-                formParameters = Parameters.build {
-                    append("grant_type", "refresh_token")
-                    append("refresh_token", refreshToken)
-                    append("scope", credentials.scope)
-                },
-            )
-        } catch (e: IllegalStateException) {
-            throw AuthorizationRequiredException("Failed to refresh the Space access token: ${e.message}")
+    val tokenInfo =
+        createAuthHttpClient().use { client ->
+            try {
+                requestOAuthToken(
+                    client = client,
+                    serverUrl = credentials.serverUrl,
+                    clientId = clientId,
+                    clientSecret = credentials.clientSecret,
+                    formParameters =
+                        Parameters.build {
+                            append("grant_type", "refresh_token")
+                            append("refresh_token", refreshToken)
+                            append("scope", credentials.scope)
+                        },
+                )
+            } catch (e: IllegalStateException) {
+                throw AuthorizationRequiredException("Failed to refresh the Space access token: ${e.message}")
+            }
         }
-    }
 
     val expiresAt = tokenInfo.expiresIn?.let { Instant.now().plusSeconds(it.toLong()).epochSecond }
     return credentials.copy(
@@ -237,12 +254,14 @@ internal fun resolveConfiguredCredentials(credentialStore: SpaceCredentialStore)
 
 internal fun environmentCredentials(stored: StoredCredentials?): StoredCredentials? {
     val envToken = readEnv("SPACE_ACCESS_TOKEN") ?: return null
-    val serverUrl = readEnv("SPACE_SERVER_URL")?.trimEnd('/')
-        ?: stored?.serverUrl
-        ?: SpaceAuthService.DEFAULT_SERVER_URL
-    val apiBaseUrl = readEnv("SPACE_API_BASE_URL")?.trimEnd('/')
-        ?: stored?.apiBaseUrl
-        ?: SpaceAuthService.defaultApiBaseUrl(serverUrl)
+    val serverUrl =
+        readEnv("SPACE_SERVER_URL")?.trimEnd('/')
+            ?: stored?.serverUrl
+            ?: SpaceAuthService.DEFAULT_SERVER_URL
+    val apiBaseUrl =
+        readEnv("SPACE_API_BASE_URL")?.trimEnd('/')
+            ?: stored?.apiBaseUrl
+            ?: SpaceAuthService.defaultApiBaseUrl(serverUrl)
 
     return StoredCredentials(
         serverUrl = serverUrl,
@@ -265,20 +284,20 @@ private suspend fun exchangeCodeForTokens(
     authorizationCode: String,
     redirectUri: String,
     codeVerifier: String,
-): OAuthTokenResponse {
-    return requestOAuthToken(
+): OAuthTokenResponse =
+    requestOAuthToken(
         client = client,
         serverUrl = serverUrl,
         clientId = clientId,
         clientSecret = clientSecret,
-        formParameters = Parameters.build {
-            append("grant_type", "authorization_code")
-            append("code", authorizationCode)
-            append("redirect_uri", redirectUri)
-            append("code_verifier", codeVerifier)
-        },
+        formParameters =
+            Parameters.build {
+                append("grant_type", "authorization_code")
+                append("code", authorizationCode)
+                append("redirect_uri", redirectUri)
+                append("code_verifier", codeVerifier)
+            },
     )
-}
 
 private fun buildAuthorizationUrl(
     serverUrl: String,
@@ -318,37 +337,32 @@ private fun createCodeChallenge(codeVerifier: String): String {
 
 private fun parseQuery(query: String): Map<String, String> {
     if (query.isBlank()) return emptyMap()
-    return query.split('&')
+    return query
+        .split('&')
         .mapNotNull { part ->
             val pieces = part.split('=', limit = 2)
             val key = pieces.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val value = pieces.getOrNull(1)?.let { URLDecoder.decode(it, StandardCharsets.UTF_8) }.orEmpty()
             key to value
-        }
-        .toMap()
+        }.toMap()
 }
 
-private fun urlEncode(value: String): String {
-    return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)
-}
+private fun urlEncode(value: String): String = java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)
 
-private fun escapeHtml(value: String): String {
-    return value
+private fun escapeHtml(value: String): String =
+    value
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
-}
 
-private fun readEnv(name: String): String? {
-    return System.getenv(name)?.takeIf { it.isNotBlank() }
-}
+private fun readEnv(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
 private fun buildAuthStatus(
     credentials: StoredCredentials? = null,
     authenticated: Boolean = false,
     currentUser: SpaceProfile? = null,
-): AuthStatus {
-    return AuthStatus(
+): AuthStatus =
+    AuthStatus(
         configured = credentials != null,
         authenticated = authenticated,
         serverUrl = credentials?.serverUrl,
@@ -358,16 +372,17 @@ private fun buildAuthStatus(
         expiresAtEpochSeconds = credentials?.expiresAtEpochSeconds,
         currentUser = currentUser,
     )
-}
 
 private fun parseRedirectConfig(redirectUri: String): RedirectConfig {
     val uri = URI(redirectUri)
-    val host = uri.host
-        ?: throw IllegalArgumentException("redirectUri must include a host.")
+    val host =
+        uri.host
+            ?: throw IllegalArgumentException("redirectUri must include a host.")
     val port = if (uri.port != -1) uri.port else uri.toURL().defaultPort
     require(port > 0) { "redirectUri must include an explicit port." }
-    val path = uri.path?.takeIf { it.isNotBlank() }
-        ?: throw IllegalArgumentException("redirectUri must include a path.")
+    val path =
+        uri.path?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("redirectUri must include a path.")
     return RedirectConfig(
         uri = uri,
         host = host,
@@ -383,12 +398,13 @@ private suspend fun requestOAuthToken(
     clientSecret: String?,
     formParameters: Parameters,
 ): OAuthTokenResponse {
-    val response = client.submitForm(
-        url = "${serverUrl.trimEnd('/')}/oauth/token",
-        formParameters = withClientId(formParameters, clientId, clientSecret),
-    ) {
-        basicAuthorization(clientId, clientSecret)
-    }
+    val response =
+        client.submitForm(
+            url = "${serverUrl.trimEnd('/')}/oauth/token",
+            formParameters = withClientId(formParameters, clientId, clientSecret),
+        ) {
+            basicAuthorization(clientId, clientSecret)
+        }
 
     if (!response.status.isSuccess()) {
         throw IllegalStateException("${response.status.value} ${response.bodyAsText()}")
@@ -424,8 +440,10 @@ private fun io.ktor.client.request.HttpRequestBuilder.basicAuthorization(
 
     headers.append(
         "Authorization",
-        "Basic " + Base64.getEncoder()
-            .encodeToString("$clientId:$clientSecret".toByteArray(StandardCharsets.UTF_8)),
+        "Basic " +
+            Base64
+                .getEncoder()
+                .encodeToString("$clientId:$clientSecret".toByteArray(StandardCharsets.UTF_8)),
     )
 }
 

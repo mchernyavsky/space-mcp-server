@@ -1,7 +1,7 @@
 package team.jetbrains.mcp.space
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -402,8 +402,8 @@ data class GenericChatMessageRecord(
     val id: String,
 )
 
-internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInReview> {
-    return commits.map { group ->
+internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInReview> =
+    commits.map { group ->
         ReviewCommitInReview(
             repositoryInReview = group.repository ?: group.repositoryInReview,
             revisions = group.revisions.mapNotNull { it.normalizedCommit() },
@@ -411,12 +411,12 @@ internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInRe
             commitWithGraph = group.commitWithGraph?.let { CommitWithGraph(commit = it.commit) },
         )
     }
-}
 
 internal fun ReviewSummary.normalized(): ReviewSummary {
-    val resolved = author
-        ?: createdBy
-        ?: participants.firstOrNull { it.role.equals("Author", ignoreCase = true) }?.profile
+    val resolved =
+        author
+            ?: createdBy
+            ?: participants.firstOrNull { it.role.equals("Author", ignoreCase = true) }?.profile
     return if (resolved == resolvedAuthor) this else copy(resolvedAuthor = resolved)
 }
 
@@ -426,12 +426,10 @@ internal fun ChatAuthor.matches(filter: String): Boolean {
         normalizedFilter == details?.user?.id
 }
 
-internal fun ChatAuthor.isUser(): Boolean {
-    return details?.user?.id != null || details?.className == "CUserPrincipalDetails"
-}
+internal fun ChatAuthor.isUser(): Boolean = details?.user?.id != null || details?.className == "CUserPrincipalDetails"
 
-private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? {
-    return commit ?: if (
+private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? =
+    commit ?: if (
         id != null ||
         message != null ||
         author != null ||
@@ -448,18 +446,19 @@ private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? {
     } else {
         null
     }
-}
 
 object SpaceKeyStringSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("SpaceKeyString", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): String {
-        return decodeSpaceKey(decoder)
+    override fun deserialize(decoder: Decoder): String =
+        decodeSpaceKey(decoder)
             ?: throw SerializationException("Space key value is missing.")
-    }
 
-    override fun serialize(encoder: Encoder, value: String) {
+    override fun serialize(
+        encoder: Encoder,
+        value: String,
+    ) {
         encoder.encodeString(value)
     }
 }
@@ -468,12 +467,13 @@ object NullableSpaceKeyStringSerializer : KSerializer<String?> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("NullableSpaceKeyString", PrimitiveKind.STRING)
 
-    override fun deserialize(decoder: Decoder): String? {
-        return decodeSpaceKey(decoder)
-    }
+    override fun deserialize(decoder: Decoder): String? = decodeSpaceKey(decoder)
 
     @OptIn(ExperimentalSerializationApi::class)
-    override fun serialize(encoder: Encoder, value: String?) {
+    override fun serialize(
+        encoder: Encoder,
+        value: String?,
+    ) {
         if (value == null) {
             encoder.encodeNull()
         } else {
@@ -487,8 +487,9 @@ private fun decodeSpaceKey(decoder: Decoder): String? {
     return when (val element = jsonDecoder.decodeJsonElement()) {
         JsonNull -> null
         is JsonPrimitive -> element.content
-        is JsonObject -> element["key"]?.jsonPrimitive?.content
-            ?: throw SerializationException("Expected Space key object to contain 'key'.")
+        is JsonObject ->
+            element["key"]?.jsonPrimitive?.content
+                ?: throw SerializationException("Expected Space key object to contain 'key'.")
         else -> throw SerializationException("Unsupported Space key payload: $element")
     }
 }

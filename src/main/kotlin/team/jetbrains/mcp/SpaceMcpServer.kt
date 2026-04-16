@@ -35,24 +35,27 @@ class SpaceMcpServer {
     private val apiClient = SpaceApiClient(credentialStore)
 
     fun run() {
-        val server = Server(
-            Implementation(
-                name = "space-mcp-server",
-                version = "0.1.0",
-            ),
-            ServerOptions(
-                capabilities = ServerCapabilities(
-                    tools = ServerCapabilities.Tools(listChanged = false),
+        val server =
+            Server(
+                Implementation(
+                    name = "space-mcp-server",
+                    version = "0.1.0",
                 ),
-            ),
-        )
+                ServerOptions(
+                    capabilities =
+                        ServerCapabilities(
+                            tools = ServerCapabilities.Tools(listChanged = false),
+                        ),
+                ),
+            )
 
         registerTools(server)
 
-        val transport = StdioServerTransport(
-            System.`in`.asSource().buffered(),
-            System.out.asSink().buffered(),
-        )
+        val transport =
+            StdioServerTransport(
+                System.`in`.asSource().buffered(),
+                System.out.asSink().buffered(),
+            )
 
         runBlocking {
             val done = CompletableDeferred<Unit>()
@@ -74,14 +77,19 @@ class SpaceMcpServer {
 
         server.registerTool(
             name = "space_authorize",
-            description = "Authorize this MCP server against a Space organization with OAuth authorization code flow and PKCE. Requires a Space client application.",
+            description =
+                "Authorize this MCP server against a Space organization with OAuth authorization code flow " +
+                    "and PKCE. Requires a Space client application.",
             required = listOf("clientId"),
             properties = {
                 stringProperty("clientId", "Space application client ID.")
                 stringProperty("clientSecret", "Optional client secret for confidential clients.")
                 stringProperty("serverUrl", "Space base URL, for example https://jetbrains.team. Defaults to https://jetbrains.team.")
                 stringProperty("scope", "OAuth scope string. Defaults to **.")
-                stringProperty("redirectUri", "Exact redirect URI configured in the Space application. Defaults to http://localhost:63363/api/space/oauth/authorization_code.")
+                stringProperty(
+                    "redirectUri",
+                    "Exact redirect URI configured in the Space application. Defaults to http://localhost:63363/api/space/oauth/authorization_code.",
+                )
                 booleanProperty("openBrowser", "Open the authorization URL in the default browser automatically. Defaults to true.")
                 numberProperty("timeoutSeconds", "How long to wait for the browser callback before failing. Defaults to 300.")
             },
@@ -184,11 +192,16 @@ class SpaceMcpServer {
 
         server.registerTool(
             name = "space_get_review",
-            description = "Get a Space code review or merge request, including author info, branch info, commits, feed comments, flattened human comments, and code discussion threads.",
+            description =
+                "Get a Space code review or merge request, including author info, branch info, commits, " +
+                    "feed comments, flattened human comments, and code discussion threads.",
             required = listOf("projectKey", "review"),
             properties = {
                 stringProperty("projectKey", "Space project key, for example IJ.")
-                stringProperty("review", "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.")
+                stringProperty(
+                    "review",
+                    "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
+                )
                 booleanProperty("includeCommits", "Include commit details. Defaults to true.")
                 booleanProperty("includeComments", "Include feed comments and code discussions. Defaults to true.")
                 numberProperty("discussionReplyLimit", "Maximum replies to fetch per discussion thread. Defaults to 50.")
@@ -209,11 +222,16 @@ class SpaceMcpServer {
 
         server.registerTool(
             name = "space_list_review_comments",
-            description = "List human-authored review comments from the main review feed and code discussion threads. Supports optional filtering by author username or user id.",
+            description =
+                "List human-authored review comments from the main review feed and code discussion threads. " +
+                    "Supports optional filtering by author username or user id.",
             required = listOf("projectKey", "review"),
             properties = {
                 stringProperty("projectKey", "Space project key, for example IJ.")
-                stringProperty("review", "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.")
+                stringProperty(
+                    "review",
+                    "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
+                )
                 stringProperty("author", "Optional author filter. Matches Space username or user id.")
                 numberProperty("discussionReplyLimit", "Maximum replies to fetch per discussion thread. Defaults to 50.")
                 numberProperty("feedBatchSize", "Maximum feed messages to fetch per sync batch. Defaults to 100.")
@@ -236,7 +254,10 @@ class SpaceMcpServer {
             required = listOf("projectKey", "review", "text"),
             properties = {
                 stringProperty("projectKey", "Space project key, for example IJ.")
-                stringProperty("review", "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.")
+                stringProperty(
+                    "review",
+                    "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
+                )
                 stringProperty("text", "Comment text.")
                 booleanProperty("pending", "Create the message as pending. Defaults to false.")
             },
@@ -255,7 +276,10 @@ class SpaceMcpServer {
             required = listOf("projectKey", "review", "repository", "revision", "filename", "text"),
             properties = {
                 stringProperty("projectKey", "Space project key, for example IJ.")
-                stringProperty("review", "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.")
+                stringProperty(
+                    "review",
+                    "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
+                )
                 stringProperty("repository", "Repository name.")
                 stringProperty("revision", "Revision hash that owns the commented line.")
                 stringProperty("filename", "Repository-relative file path.")
@@ -311,10 +335,11 @@ class SpaceMcpServer {
             Tool(
                 name = name,
                 description = description,
-                inputSchema = ToolSchema(
-                    properties = buildJsonObject(properties),
-                    required = required,
-                ),
+                inputSchema =
+                    ToolSchema(
+                        properties = buildJsonObject(properties),
+                        required = required,
+                    ),
             ),
         ) { request ->
             respond {
@@ -323,66 +348,63 @@ class SpaceMcpServer {
         }
     }
 
-    private suspend inline fun <reified T> respond(crossinline block: suspend () -> T): CallToolResult {
-        return try {
+    private suspend inline fun <reified T> respond(crossinline block: suspend () -> T): CallToolResult =
+        try {
             result(block())
         } catch (t: Throwable) {
             error("${t::class.simpleName}: ${t.message ?: "Unknown error"}")
         }
-    }
 
-    private inline fun <reified T> result(payload: T): CallToolResult {
-        return CallToolResult(
+    private inline fun <reified T> result(payload: T): CallToolResult =
+        CallToolResult(
             content = listOf(TextContent(text = jsonSupport.encode(payload))),
         )
-    }
 
-    private fun error(message: String): CallToolResult {
-        return CallToolResult(
+    private fun error(message: String): CallToolResult =
+        CallToolResult(
             content = listOf(TextContent(text = message)),
             isError = true,
         )
-    }
 }
 
-private fun CallToolRequest.argumentsOrEmpty(): JsonObject {
-    return arguments ?: EMPTY_JSON_OBJECT
-}
+private fun CallToolRequest.argumentsOrEmpty(): JsonObject = arguments ?: EMPTY_JSON_OBJECT
 
 private val EMPTY_JSON_OBJECT = buildJsonObject {}
 
-private fun JsonObject.requiredString(name: String): String {
-    return this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+private fun JsonObject.requiredString(name: String): String =
+    this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         ?: throw IllegalArgumentException("Missing required string argument '$name'.")
-}
 
-private fun JsonObject.optionalString(name: String): String? {
-    return this[name]?.jsonPrimitive?.contentOrNull
-}
+private fun JsonObject.optionalString(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull
 
-private fun JsonObject.optionalBoolean(name: String): Boolean? {
-    return this[name]?.jsonPrimitive?.booleanOrNull
-}
+private fun JsonObject.optionalBoolean(name: String): Boolean? = this[name]?.jsonPrimitive?.booleanOrNull
 
-private fun JsonObject.optionalInt(name: String): Int? {
-    return this[name]?.jsonPrimitive?.intOrNull
-}
+private fun JsonObject.optionalInt(name: String): Int? = this[name]?.jsonPrimitive?.intOrNull
 
-private fun JsonObjectBuilder.stringProperty(name: String, description: String) {
+private fun JsonObjectBuilder.stringProperty(
+    name: String,
+    description: String,
+) {
     putJsonObject(name) {
         put("type", JsonPrimitive("string"))
         put("description", JsonPrimitive(description))
     }
 }
 
-private fun JsonObjectBuilder.numberProperty(name: String, description: String) {
+private fun JsonObjectBuilder.numberProperty(
+    name: String,
+    description: String,
+) {
     putJsonObject(name) {
         put("type", JsonPrimitive("integer"))
         put("description", JsonPrimitive(description))
     }
 }
 
-private fun JsonObjectBuilder.booleanProperty(name: String, description: String) {
+private fun JsonObjectBuilder.booleanProperty(
+    name: String,
+    description: String,
+) {
     putJsonObject(name) {
         put("type", JsonPrimitive("boolean"))
         put("description", JsonPrimitive(description))

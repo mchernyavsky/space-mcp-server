@@ -6,12 +6,13 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 class SpaceCredentialStore {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = true
-        encodeDefaults = true
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+            encodeDefaults = true
+            explicitNulls = false
+        }
 
     private val configDirectory: Path = defaultConfigDirectory()
     private val configFile: Path = configDirectory.resolve("credentials.json")

@@ -13,6 +13,15 @@ out/
 
 # Local environment
 local.properties
+.env
+.env.*
+credentials.json
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
+*.pfx
 *.log
 
 # OS files
