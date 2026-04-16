@@ -11,7 +11,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -401,12 +400,6 @@ data class GenericApiRecord(
 @Serializable
 data class GenericChatMessageRecord(
     val id: String,
-)
-
-@Serializable
-data class SpaceError(
-    val message: String,
-    val details: JsonElement? = null,
 )
 
 internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInReview> {
