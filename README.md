@@ -93,10 +93,10 @@ Example local MCP config:
 {
   "mcpServers": {
     "Space": {
-      "command": "/Users/Mikhail.Chernyavsky/Library/Java/JavaVirtualMachines/jbr-21.0.10/Contents/Home/bin/java",
+      "command": "java",
       "args": [
         "-jar",
-        "/Users/Mikhail.Chernyavsky/Workspaces/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
+        "/path/to/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
       ],
       "env": {
         "SPACE_SERVER_URL": "https://jetbrains.team",
