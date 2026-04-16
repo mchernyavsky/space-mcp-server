@@ -278,12 +278,12 @@ class SpaceMcpServer {
         }
     }
 
-    private fun Server.registerTool(
+    private inline fun <reified T> Server.registerTool(
         name: String,
         description: String,
         required: List<String> = emptyList(),
         properties: JsonObjectBuilder.() -> Unit = {},
-        handler: suspend (JsonObject) -> Any,
+        noinline handler: suspend (JsonObject) -> T,
     ) {
         addTool(
             Tool(
