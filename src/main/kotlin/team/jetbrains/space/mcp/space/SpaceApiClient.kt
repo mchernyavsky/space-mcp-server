@@ -410,23 +410,24 @@ class SpaceApiClient(
 
     private suspend fun authorizedCredentials(): StoredCredentials {
         val stored = credentialStore.load()
-            ?: throw AuthorizationRequiredException("Space credentials are not configured. Run the space_authorize tool first.")
-
-        val envToken = System.getenv("SPACE_ACCESS_TOKEN")?.takeIf { it.isNotBlank() }
-        if (envToken != null) {
-            return stored.copy(accessToken = envToken)
+        val envCredentials = environmentCredentials(stored)
+        if (envCredentials != null) {
+            return envCredentials
         }
 
-        val accessToken = stored.accessToken
-            ?: throw AuthorizationRequiredException("No Space access token is stored. Run the space_authorize tool first.")
+        val persisted = stored
+            ?: throw AuthorizationRequiredException("Space credentials are not configured. Run the space_authorize tool first or set SPACE_ACCESS_TOKEN.")
 
-        val expiresAt = stored.expiresAtEpochSeconds
+        val accessToken = persisted.accessToken
+            ?: throw AuthorizationRequiredException("No Space access token is stored. Run the space_authorize tool first or set SPACE_ACCESS_TOKEN.")
+
+        val expiresAt = persisted.expiresAtEpochSeconds
         val isExpired = expiresAt != null && Instant.now().epochSecond >= (expiresAt - 30)
         if (!isExpired) {
-            return stored.copy(accessToken = accessToken)
+            return persisted.copy(accessToken = accessToken)
         }
 
-        val refreshed = refreshAccessToken(stored)
+        val refreshed = refreshAccessToken(persisted)
         credentialStore.save(refreshed)
         return refreshed
     }

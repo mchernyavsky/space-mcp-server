@@ -64,10 +64,16 @@ http://localhost:63363/api/space/oauth/authorization_code
 ```
 
 - For a regular Space application, the exact redirect URI must be configured in the Space app settings.
+- Local `stdio` clients can also bootstrap auth without OAuth by setting:
+  - `SPACE_ACCESS_TOKEN`
+  - optional `SPACE_SERVER_URL`
+  - optional `SPACE_API_BASE_URL`
+  - optional `SPACE_SCOPE`
+  - optional `SPACE_CLIENT_ID`
 - Credentials are stored under:
   - `$XDG_CONFIG_HOME/space-mcp-server/credentials.json`, or
   - `~/.config/space-mcp-server/credentials.json`
-- `SPACE_ACCESS_TOKEN` overrides the stored access token at runtime.
+- `SPACE_ACCESS_TOKEN` overrides the stored access token at runtime and now also works without a pre-existing credentials file.
 
 ## Current MCP Tools
 

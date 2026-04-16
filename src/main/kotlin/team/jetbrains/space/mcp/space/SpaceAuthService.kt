@@ -34,7 +34,7 @@ class SpaceAuthService(
 ) {
 
     suspend fun status(apiClient: SpaceApiClient): AuthStatus {
-        val credentials = credentialStore.load()
+        val credentials = resolveConfiguredCredentials(credentialStore)
         if (credentials == null) {
             return buildAuthStatus()
         }
@@ -230,6 +230,33 @@ internal suspend fun refreshAccessToken(credentials: StoredCredentials): StoredC
     )
 }
 
+internal fun resolveConfiguredCredentials(credentialStore: SpaceCredentialStore): StoredCredentials? {
+    val stored = credentialStore.load()
+    return environmentCredentials(stored) ?: stored
+}
+
+internal fun environmentCredentials(stored: StoredCredentials?): StoredCredentials? {
+    val envToken = readEnv("SPACE_ACCESS_TOKEN") ?: return null
+    val serverUrl = readEnv("SPACE_SERVER_URL")?.trimEnd('/')
+        ?: stored?.serverUrl
+        ?: SpaceAuthService.DEFAULT_SERVER_URL
+    val apiBaseUrl = readEnv("SPACE_API_BASE_URL")?.trimEnd('/')
+        ?: stored?.apiBaseUrl
+        ?: SpaceAuthService.defaultApiBaseUrl(serverUrl)
+
+    return StoredCredentials(
+        serverUrl = serverUrl,
+        apiBaseUrl = apiBaseUrl,
+        clientId = readEnv("SPACE_CLIENT_ID") ?: stored?.clientId,
+        clientSecret = stored?.clientSecret,
+        scope = readEnv("SPACE_SCOPE") ?: stored?.scope ?: SpaceAuthService.DEFAULT_SCOPE,
+        redirectUri = stored?.redirectUri,
+        accessToken = envToken,
+        refreshToken = stored?.refreshToken,
+        expiresAtEpochSeconds = null,
+    )
+}
+
 private suspend fun exchangeCodeForTokens(
     client: HttpClient,
     serverUrl: String,
@@ -310,6 +337,10 @@ private fun escapeHtml(value: String): String {
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+}
+
+private fun readEnv(name: String): String? {
+    return System.getenv(name)?.takeIf { it.isNotBlank() }
 }
 
 private fun buildAuthStatus(

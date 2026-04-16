@@ -49,6 +49,13 @@ The server uses stdio transport.
 
 ## Authorization
 
+The server supports two auth modes:
+
+- OAuth via the `space_authorize` MCP tool
+- direct bearer-token bootstrap via environment variables for local `stdio` clients
+
+### OAuth
+
 Use the `space_authorize` MCP tool with:
 
 - `clientId`
@@ -65,7 +72,37 @@ http://localhost:63363/api/space/oauth/authorization_code
 
 For a normal Space application, configure the exact same redirect URI in the Space app settings.
 
-`SPACE_ACCESS_TOKEN` can be used to override the stored access token at runtime.
+### Environment Variables
+
+If your MCP host can pass environment variables to a local server process, you can skip the interactive OAuth tool and bootstrap auth directly with:
+
+- `SPACE_ACCESS_TOKEN`
+- optional `SPACE_SERVER_URL` (defaults to `https://jetbrains.team`)
+- optional `SPACE_API_BASE_URL` (defaults to `<SPACE_SERVER_URL>/api/http`)
+- optional `SPACE_SCOPE`
+- optional `SPACE_CLIENT_ID`
+
+`SPACE_ACCESS_TOKEN` also overrides the stored access token at runtime when OAuth credentials already exist.
+
+Example local MCP config:
+
+```json
+{
+  "mcpServers": {
+    "Space": {
+      "command": "/Users/Mikhail.Chernyavsky/Library/Java/JavaVirtualMachines/jbr-21.0.10/Contents/Home/bin/java",
+      "args": [
+        "-jar",
+        "/Users/Mikhail.Chernyavsky/Workspaces/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
+      ],
+      "env": {
+        "SPACE_SERVER_URL": "https://jetbrains.team",
+        "SPACE_ACCESS_TOKEN": "your-token"
+      }
+    }
+  }
+}
+```
 
 Stored credentials are written to:
 
