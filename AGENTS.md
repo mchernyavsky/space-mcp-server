@@ -37,6 +37,8 @@ Keep the implementation focused on:
   - Local credential persistence
 - `.github/workflows/ci.yml`
   - GitHub Actions build and lint workflow
+- `.github/workflows/release.yml`
+  - GitHub Actions release workflow and GitHub release asset publishing
 - `LICENSE`
   - Apache-2.0 project license
 - `PROVENANCE.md`

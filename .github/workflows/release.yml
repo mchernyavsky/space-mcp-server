@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0"
+        required: true
+      prerelease:
+        description: "Mark the GitHub release as a prerelease"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve release metadata
+        id: metadata
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            release_tag="${{ github.event.inputs.tag }}"
+          else
+            release_tag="${GITHUB_REF_NAME}"
+          fi
+          release_version="${release_tag#v}"
+          echo "tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${release_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release artifacts
+        run: ./gradlew clean build --no-daemon
+
+      - name: Prepare release bundle
+        run: |
+          mkdir -p release-assets
+          cp build/libs/*-all.jar "release-assets/space-mcp-server-${{ steps.metadata.outputs.version }}-all.jar"
+          (
+            cd release-assets
+            shasum -a 256 space-mcp-server-${{ steps.metadata.outputs.version }}-all.jar > SHA256SUMS.txt
+          )
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: space-mcp-server-release-${{ steps.metadata.outputs.tag }}
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.tag }}
+          name: Space MCP Server ${{ steps.metadata.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'true' }}
+          files: |
+            release-assets/space-mcp-server-${{ steps.metadata.outputs.version }}-all.jar
+            release-assets/SHA256SUMS.txt
