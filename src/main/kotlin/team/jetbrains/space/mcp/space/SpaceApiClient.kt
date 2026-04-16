@@ -521,10 +521,10 @@ class SpaceApiClient(
         projectKey: String,
         reviewRef: String,
     ): List<ReviewCommitInReview> {
-        return get<ReviewDetailsResponse>(
+        return get<RawReviewDetailsResponse>(
             credentials = credentials,
             path = listOf("projects", "key:$projectKey", "code-reviews", normalizeReviewIdentifier(reviewRef), "details"),
-        ).commits
+        ).normalizedCommits()
     }
 
     private suspend fun fetchReviewFeedChannelId(

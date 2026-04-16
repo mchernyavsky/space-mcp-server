@@ -1,8 +1,21 @@
 package team.jetbrains.space.mcp.space
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class StoredCredentials(
@@ -64,6 +77,7 @@ data class BatchResponse<T>(
 @Serializable
 data class ProjectSummary(
     val id: String,
+    @Serializable(with = SpaceKeyStringSerializer::class)
     val key: String,
     val name: String,
     val private: Boolean? = null,
@@ -79,6 +93,7 @@ data class ReviewSummary(
     @SerialName("className")
     val className: String? = null,
     val id: String,
+    @Serializable(with = NullableSpaceKeyStringSerializer::class)
     val key: String? = null,
     val number: Int,
     val title: String,
@@ -131,9 +146,47 @@ data class CrossProjectReview(
 )
 
 @Serializable
-data class ReviewDetailsResponse(
-    val shortInfo: ReviewSummary,
-    val commits: List<ReviewCommitInReview> = emptyList(),
+data class RawReviewDetailsResponse(
+    val shortInfo: ReviewSummaryReference? = null,
+    val commits: List<RawReviewCommitGroup> = emptyList(),
+)
+
+@Serializable
+data class ReviewSummaryReference(
+    @SerialName("className")
+    val className: String? = null,
+    val id: String,
+    @Serializable(with = NullableSpaceKeyStringSerializer::class)
+    val key: String? = null,
+    val number: Int? = null,
+    val title: String? = null,
+)
+
+@Serializable
+data class RawReviewCommitGroup(
+    @SerialName("repository")
+    val repository: RepositoryInReview? = null,
+    val repositoryInReview: RepositoryInReview? = null,
+    val revisions: List<RawReviewCommitEntry> = emptyList(),
+    val commits: List<RawReviewCommitEntry> = emptyList(),
+    val commitWithGraph: RawCommitWithGraph? = null,
+)
+
+@Serializable
+data class RawReviewCommitEntry(
+    val repositoryName: String? = null,
+    val commit: ReviewCommit? = null,
+    val id: String? = null,
+    val message: String? = null,
+    val author: ReviewCommitAuthor? = null,
+    val timestamp: Long? = null,
+    val authorDate: Long? = null,
+    val commitDate: Long? = null,
+)
+
+@Serializable
+data class RawCommitWithGraph(
+    val commit: ReviewCommit? = null,
 )
 
 @Serializable
@@ -315,3 +368,77 @@ data class SpaceError(
     val message: String,
     val details: JsonElement? = null,
 )
+
+internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInReview> {
+    return commits.map { group ->
+        ReviewCommitInReview(
+            repositoryInReview = group.repository ?: group.repositoryInReview,
+            revisions = group.revisions.mapNotNull { it.normalizedCommit() },
+            commits = group.commits.mapNotNull { it.normalizedCommit() },
+            commitWithGraph = group.commitWithGraph?.let { CommitWithGraph(commit = it.commit) },
+        )
+    }
+}
+
+private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? {
+    return commit ?: if (
+        id != null ||
+        message != null ||
+        author != null ||
+        timestamp != null ||
+        authorDate != null ||
+        commitDate != null
+    ) {
+        ReviewCommit(
+            id = id,
+            message = message,
+            author = author,
+            timestamp = timestamp ?: authorDate ?: commitDate,
+        )
+    } else {
+        null
+    }
+}
+
+object SpaceKeyStringSerializer : KSerializer<String> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SpaceKeyString", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String {
+        return decodeSpaceKey(decoder)
+            ?: throw SerializationException("Space key value is missing.")
+    }
+
+    override fun serialize(encoder: Encoder, value: String) {
+        encoder.encodeString(value)
+    }
+}
+
+object NullableSpaceKeyStringSerializer : KSerializer<String?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("NullableSpaceKeyString", PrimitiveKind.STRING)
+
+    override fun deserialize(decoder: Decoder): String? {
+        return decodeSpaceKey(decoder)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    override fun serialize(encoder: Encoder, value: String?) {
+        if (value == null) {
+            encoder.encodeNull()
+        } else {
+            encoder.encodeString(value)
+        }
+    }
+}
+
+private fun decodeSpaceKey(decoder: Decoder): String? {
+    val jsonDecoder = decoder as? JsonDecoder ?: return decoder.decodeString()
+    return when (val element = jsonDecoder.decodeJsonElement()) {
+        JsonNull -> null
+        is JsonPrimitive -> element.content
+        is JsonObject -> element["key"]?.jsonPrimitive?.content
+            ?: throw SerializationException("Expected Space key object to contain 'key'.")
+        else -> throw SerializationException("Unsupported Space key payload: $element")
+    }
+}
