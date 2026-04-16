@@ -28,10 +28,6 @@ class SpaceCredentialStore {
         Files.writeString(configFile, json.encodeToString(StoredCredentials.serializer(), credentials))
     }
 
-    fun clear() {
-        Files.deleteIfExists(configFile)
-    }
-
     private fun defaultConfigDirectory(): Path {
         val xdgHome = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }
         return if (xdgHome != null) {
