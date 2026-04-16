@@ -5,7 +5,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-class SpaceCredentialStore {
+class SpaceCredentialStore(
+    private val configDirectory: Path = defaultConfigDirectory(),
+) {
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -14,7 +16,6 @@ class SpaceCredentialStore {
             explicitNulls = false
         }
 
-    private val configDirectory: Path = defaultConfigDirectory()
     private val configFile: Path = configDirectory.resolve("credentials.json")
 
     fun load(): StoredCredentials? {
@@ -29,12 +30,14 @@ class SpaceCredentialStore {
         Files.writeString(configFile, json.encodeToString(StoredCredentials.serializer(), credentials))
     }
 
-    private fun defaultConfigDirectory(): Path {
-        val xdgHome = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }
-        return if (xdgHome != null) {
-            Paths.get(xdgHome, "space-mcp-server")
-        } else {
-            Paths.get(System.getProperty("user.home"), ".config", "space-mcp-server")
+    companion object {
+        private fun defaultConfigDirectory(): Path {
+            val xdgHome = System.getenv("XDG_CONFIG_HOME")?.takeIf { it.isNotBlank() }
+            return if (xdgHome != null) {
+                Paths.get(xdgHome, "space-mcp-server")
+            } else {
+                Paths.get(System.getProperty("user.home"), ".config", "space-mcp-server")
+            }
         }
     }
 }

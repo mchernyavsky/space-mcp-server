@@ -26,6 +26,7 @@ import java.time.Instant
 
 class SpaceApiClient(
     private val credentialStore: SpaceCredentialStore,
+    private val httpClientFactory: (Json) -> HttpClient = ::defaultHttpClient,
 ) {
     private val json =
         Json {
@@ -438,13 +439,7 @@ class SpaceApiClient(
             }
         }
 
-    private fun httpClient(): HttpClient =
-        HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(json)
-            }
-            expectSuccess = false
-        }
+    private fun httpClient(): HttpClient = httpClientFactory(json)
 
     private suspend fun authorizedCredentials(): StoredCredentials {
         val stored = credentialStore.load()
@@ -794,6 +789,14 @@ class SpaceApiClient(
         )
 
     private companion object {
+        fun defaultHttpClient(json: Json): HttpClient =
+            HttpClient(CIO) {
+                install(ContentNegotiation) {
+                    json(json)
+                }
+                expectSuccess = false
+            }
+
         const val REVIEW_LIST_FIELDS =
             "data(review(className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale),author(id,username,name(firstName,lastName)),createdBy(id,username,name(firstName,lastName)),participants(role,profile(id,username,name(firstName,lastName))),reviewers(reviewer(id,username,name(firstName,lastName))))),totalCount,hasMore,next"
         const val REVIEW_SUMMARY_FIELDS =

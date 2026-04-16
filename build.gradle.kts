@@ -40,6 +40,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     implementation("org.slf4j:slf4j-simple:$slf4jVersion")
     testImplementation(kotlin("test"))
+    testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
 }
 
 tasks.withType<Test>().configureEach {
