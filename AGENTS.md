@@ -83,6 +83,7 @@ http://localhost:63363/api/space/oauth/authorization_code
 - `space_list_reviews`
 - `space_list_my_reviews`
 - `space_get_review`
+- `space_list_review_comments`
 - `space_post_review_comment`
 - `space_create_code_discussion`
 - `space_reply_to_discussion`
@@ -95,6 +96,7 @@ Keep tool names stable unless there is a strong reason to break compatibility.
 - Public review details exist via `GET /projects/{project}/code-reviews/{reviewId}`.
 - Review commits are available via `GET /projects/{project}/code-reviews/{reviewId}/details`.
 - Review comments are retrieved through the review `feedChannelId` and chat APIs.
+- Plain review-feed comments can carry author information directly on the chat message, while code-discussion roots and replies come through discussion channels. Keep both shapes wired.
 - Code discussion creation is supported via `POST /projects/{project}/code-reviews/code-discussions`.
 - Plain replies/comments are supported through chat message endpoints.
 

@@ -82,7 +82,7 @@ class SpaceApiClient(
         offset: Int,
     ): BatchResponse<ReviewListItemResponse> {
         return withAuthorizedCredentials { credentials ->
-            get(
+            val response = get<BatchResponse<ReviewListItemResponse>>(
                 credentials = credentials,
                 path = listOf("projects", "key:$projectKey", "code-reviews"),
                 query = reviewQuery(
@@ -99,6 +99,9 @@ class SpaceApiClient(
                     offset = offset,
                 ),
                 fields = REVIEW_LIST_FIELDS,
+            )
+            response.copy(
+                data = response.data.map { it.copy(review = it.review.normalized()) }
             )
         }
     }
@@ -183,6 +186,34 @@ class SpaceApiClient(
                 } else {
                     null
                 },
+            )
+        }
+    }
+
+    suspend fun listReviewComments(
+        projectKey: String,
+        reviewRef: String,
+        author: String?,
+        discussionReplyLimit: Int,
+        feedBatchSize: Int,
+        feedBatchLimit: Int,
+    ): ReviewCommentsResponse {
+        return withAuthorizedCredentials { credentials ->
+            val review = fetchReviewSummary(credentials, projectKey, reviewRef)
+            val comments = loadComments(
+                credentials = credentials,
+                feedChannelId = requireFeedChannelId(review),
+                discussionReplyLimit = discussionReplyLimit,
+                feedBatchSize = feedBatchSize,
+                feedBatchLimit = feedBatchLimit,
+            )
+            val filtered = filterCommentEntries(comments.entries, author)
+            ReviewCommentsResponse(
+                review = review,
+                feedChannelId = comments.feedChannelId,
+                authorFilter = author,
+                count = filtered.size,
+                comments = filtered,
             )
         }
     }
@@ -287,18 +318,21 @@ class SpaceApiClient(
             )
         }
 
+        val mappedFeedMessages = feedMessages.map {
+            FeedMessage(
+                id = it.id,
+                text = it.text,
+                created = it.created,
+                author = it.author ?: it.projectedItem?.author,
+                details = it.details,
+            )
+        }
+
         return ReviewCommentBundle(
             feedChannelId = feedChannelId,
-            feedMessages = feedMessages.map {
-                FeedMessage(
-                    id = it.id,
-                    text = it.text,
-                    created = it.created,
-                    author = it.projectedItem?.author,
-                    details = it.details,
-                )
-            },
+            feedMessages = mappedFeedMessages,
             codeDiscussions = threads,
+            entries = buildCommentEntries(mappedFeedMessages, threads),
         )
     }
 
@@ -319,7 +353,7 @@ class SpaceApiClient(
                     "batchInfo" to "{etag:$etag,batchSize:$batchSize}",
                     "channel" to "id:$channelId",
                 ),
-                fields = "data(chatMessage(id,text,created,details(className,codeDiscussion(id,channel(id),anchor(filename,line,oldLine,revision))),projectedItem(author(name,details(className,user(id)))))),etag,hasMore",
+                fields = "data(chatMessage(id,text,created,author(name,details(className,user(id))),details(className,codeDiscussion(id,channel(id),anchor(filename,line,oldLine,revision))),projectedItem(author(name,details(className,user(id)))))),etag,hasMore",
             )
 
             messages += batch.data.mapNotNull { it.chatMessage }
@@ -509,11 +543,11 @@ class SpaceApiClient(
         projectKey: String,
         reviewRef: String,
     ): ReviewSummary {
-        return get(
+        return get<ReviewSummary>(
             credentials = credentials,
             path = listOf("projects", "key:$projectKey", "code-reviews", normalizeReviewIdentifier(reviewRef)),
             fields = REVIEW_SUMMARY_FIELDS,
-        )
+        ).normalized()
     }
 
     private suspend fun fetchReviewCommits(
@@ -562,6 +596,56 @@ class SpaceApiClient(
                 put("endAnchor", buildAnchor(revision, filename, endLine, endOldLine))
             }
         }
+    }
+
+    private fun buildCommentEntries(
+        feedMessages: List<FeedMessage>,
+        threads: List<CodeDiscussionThread>,
+    ): List<ReviewCommentEntry> {
+        val directFeedComments = feedMessages.mapNotNull { message ->
+            val author = message.author ?: return@mapNotNull null
+            val kind = message.details?.className
+            if (kind != "M2TextItemContent" || message.text.isNullOrBlank() || !author.isUser()) {
+                return@mapNotNull null
+            }
+            ReviewCommentEntry(
+                id = message.id,
+                kind = "review-feed",
+                text = message.text,
+                created = message.created,
+                author = author,
+            )
+        }
+
+        val discussionComments = threads.flatMap { thread ->
+            thread.messages.mapNotNull { message ->
+                if (message.text.isNullOrBlank() || message.author?.isUser() != true) {
+                    return@mapNotNull null
+                }
+                ReviewCommentEntry(
+                    id = message.id,
+                    kind = "code-discussion",
+                    text = message.text,
+                    created = message.created,
+                    author = message.author,
+                    discussionId = thread.id,
+                    channelId = thread.channelId,
+                    anchor = thread.anchor,
+                    feedMessageId = thread.feedMessageId,
+                )
+            }
+        }
+
+        return (directFeedComments + discussionComments)
+            .sortedBy { it.created?.timestamp ?: Long.MIN_VALUE }
+    }
+
+    private fun filterCommentEntries(
+        entries: List<ReviewCommentEntry>,
+        author: String?,
+    ): List<ReviewCommentEntry> {
+        val filter = author?.trim()?.takeIf { it.isNotEmpty() } ?: return entries
+        return entries.filter { it.author?.matches(filter) == true }
     }
 
     private fun buildAnchor(
@@ -700,9 +784,9 @@ class SpaceApiClient(
 
     private companion object {
         const val REVIEW_LIST_FIELDS =
-            "data(review(className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale))),totalCount,hasMore,next"
+            "data(review(className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale),author(id,username,name(firstName,lastName)),createdBy(id,username,name(firstName,lastName)),participants(role,profile(id,username,name(firstName,lastName))),reviewers(reviewer(id,username,name(firstName,lastName))))),totalCount,hasMore,next"
         const val REVIEW_SUMMARY_FIELDS =
-            "className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale)"
+            "className,id,key,number,title,state,createdAt,timestamp,feedChannelId,branchPair(repository,sourceBranchRef,sourceBranchInfo(displayName,ref,deleted,head),targetBranchInfo(displayName,ref,deleted,head),isMerged,isStale),author(id,username,name(firstName,lastName)),createdBy(id,username,name(firstName,lastName)),participants(role,profile(id,username,name(firstName,lastName))),reviewers(reviewer(id,username,name(firstName,lastName)))"
     }
 }
 

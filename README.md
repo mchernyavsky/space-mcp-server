@@ -18,10 +18,13 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
   - `to`
 - Aggregating "my reviews" across visible projects by scanning projects with `author=me` and `reviewer=me`
 - Fetching a review with:
+  - resolved review author / creator details when available
   - branch information
   - commits
   - review feed messages
+  - flattened human-authored comments
   - code discussion threads and replies
+- Listing human-authored review comments with optional author filtering
 - Posting a plain review comment to the main review feed
 - Creating a code discussion anchored to a file/line
 - Replying to an existing discussion channel
@@ -117,6 +120,7 @@ Stored credentials are written to:
 - `space_list_reviews`
 - `space_list_my_reviews`
 - `space_get_review`
+- `space_list_review_comments`
 - `space_post_review_comment`
 - `space_create_code_discussion`
 - `space_reply_to_discussion`

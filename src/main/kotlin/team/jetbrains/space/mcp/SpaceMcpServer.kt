@@ -185,7 +185,7 @@ class SpaceMcpServer {
 
         server.registerTool(
             name = "space_get_review",
-            description = "Get a Space code review or merge request, including branch info, commits, feed comments, and code discussion threads.",
+            description = "Get a Space code review or merge request, including author info, branch info, commits, feed comments, flattened human comments, and code discussion threads.",
             required = listOf("projectKey", "review"),
             properties = {
                 stringProperty("projectKey", "Space project key, for example IJ.")
@@ -202,6 +202,29 @@ class SpaceMcpServer {
                 reviewRef = arguments.requiredString("review"),
                 includeCommits = arguments.optionalBoolean("includeCommits") ?: true,
                 includeComments = arguments.optionalBoolean("includeComments") ?: true,
+                discussionReplyLimit = arguments.optionalInt("discussionReplyLimit") ?: 50,
+                feedBatchSize = arguments.optionalInt("feedBatchSize") ?: 100,
+                feedBatchLimit = arguments.optionalInt("feedBatchLimit") ?: 50,
+            )
+        }
+
+        server.registerTool(
+            name = "space_list_review_comments",
+            description = "List human-authored review comments from the main review feed and code discussion threads. Supports optional filtering by author username or user id.",
+            required = listOf("projectKey", "review"),
+            properties = {
+                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("review", "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.")
+                stringProperty("author", "Optional author filter. Matches Space username or user id.")
+                numberProperty("discussionReplyLimit", "Maximum replies to fetch per discussion thread. Defaults to 50.")
+                numberProperty("feedBatchSize", "Maximum feed messages to fetch per sync batch. Defaults to 100.")
+                numberProperty("feedBatchLimit", "Maximum number of feed sync batches to fetch. Defaults to 50.")
+            },
+        ) { arguments ->
+            apiClient.listReviewComments(
+                projectKey = arguments.requiredString("projectKey"),
+                reviewRef = arguments.requiredString("review"),
+                author = arguments.optionalString("author"),
                 discussionReplyLimit = arguments.optionalInt("discussionReplyLimit") ?: 50,
                 feedBatchSize = arguments.optionalInt("feedBatchSize") ?: 100,
                 feedBatchLimit = arguments.optionalInt("feedBatchLimit") ?: 50,

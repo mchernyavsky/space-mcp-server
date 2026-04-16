@@ -102,6 +102,22 @@ data class ReviewSummary(
     val timestamp: Long? = null,
     val feedChannelId: String? = null,
     val branchPair: MergeRequestBranchPair? = null,
+    val author: SpaceProfile? = null,
+    val createdBy: SpaceProfile? = null,
+    val participants: List<ReviewParticipant> = emptyList(),
+    val reviewers: List<ReviewReviewer> = emptyList(),
+    val resolvedAuthor: SpaceProfile? = null,
+)
+
+@Serializable
+data class ReviewParticipant(
+    val role: String? = null,
+    val profile: SpaceProfile? = null,
+)
+
+@Serializable
+data class ReviewReviewer(
+    val reviewer: SpaceProfile? = null,
 )
 
 @Serializable
@@ -127,6 +143,15 @@ data class ReviewDetailsBundle(
     val review: ReviewSummary,
     val commits: List<ReviewCommitInReview> = emptyList(),
     val comments: ReviewCommentBundle? = null,
+)
+
+@Serializable
+data class ReviewCommentsResponse(
+    val review: ReviewSummary,
+    val feedChannelId: String,
+    val authorFilter: String? = null,
+    val count: Int,
+    val comments: List<ReviewCommentEntry> = emptyList(),
 )
 
 @Serializable
@@ -226,6 +251,7 @@ data class ReviewCommentBundle(
     val feedChannelId: String,
     val feedMessages: List<FeedMessage> = emptyList(),
     val codeDiscussions: List<CodeDiscussionThread> = emptyList(),
+    val entries: List<ReviewCommentEntry> = emptyList(),
 )
 
 @Serializable
@@ -246,6 +272,7 @@ data class SyncChatMessage(
     val text: String? = null,
     val created: Timestamp? = null,
     val details: MessageDetails? = null,
+    val author: ChatAuthor? = null,
     val projectedItem: ProjectedItem? = null,
 )
 
@@ -318,6 +345,19 @@ data class ChannelMessage(
 )
 
 @Serializable
+data class ReviewCommentEntry(
+    val id: String,
+    val kind: String,
+    val text: String? = null,
+    val created: Timestamp? = null,
+    val author: ChatAuthor? = null,
+    val discussionId: String? = null,
+    val channelId: String? = null,
+    val anchor: DiscussionAnchor? = null,
+    val feedMessageId: String? = null,
+)
+
+@Serializable
 data class ChatAuthor(
     val name: String? = null,
     val details: AuthorDetails? = null,
@@ -378,6 +418,23 @@ internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInRe
             commitWithGraph = group.commitWithGraph?.let { CommitWithGraph(commit = it.commit) },
         )
     }
+}
+
+internal fun ReviewSummary.normalized(): ReviewSummary {
+    val resolved = author
+        ?: createdBy
+        ?: participants.firstOrNull { it.role.equals("Author", ignoreCase = true) }?.profile
+    return if (resolved == resolvedAuthor) this else copy(resolvedAuthor = resolved)
+}
+
+internal fun ChatAuthor.matches(filter: String): Boolean {
+    val normalizedFilter = filter.trim()
+    return normalizedFilter.equals(name, ignoreCase = true) ||
+        normalizedFilter == details?.user?.id
+}
+
+internal fun ChatAuthor.isUser(): Boolean {
+    return details?.user?.id != null || details?.className == "CUserPrincipalDetails"
 }
 
 private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? {
