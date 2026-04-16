@@ -1,7 +1,7 @@
 # Space MCP Server
 
 [![CI](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/ci.yml)
-[![Release](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/release.yml/badge.svg)](https://github.com/mchernyavsky/space-mcp-server/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/mchernyavsky/space-mcp-server?include_prereleases&display_name=tag)](https://github.com/mchernyavsky/space-mcp-server/releases/latest)
 ![Java 21](https://img.shields.io/badge/java-21-007396)
 ![Kotlin 2.3.20](https://img.shields.io/badge/kotlin-2.3.20-7F52FF)
 ![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
