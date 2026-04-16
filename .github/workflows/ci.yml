@@ -27,3 +27,20 @@ jobs:
 
       - name: Build and lint
         run: ./gradlew build --no-daemon
+
+      - name: Upload runnable jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: space-mcp-server-jar
+          path: build/libs/*-all.jar
+          if-no-files-found: error
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: space-mcp-server-reports
+          path: |
+            build/reports/**
+            build/test-results/**
+          if-no-files-found: warn
