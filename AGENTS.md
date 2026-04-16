@@ -35,6 +35,14 @@ Keep the implementation focused on:
   - DTOs for MCP responses and Space payloads
 - `src/main/kotlin/team/jetbrains/mcp/space/SpaceCredentialStore.kt`
   - Local credential persistence
+- `.github/workflows/ci.yml`
+  - GitHub Actions build and lint workflow
+- `LICENSE`
+  - Apache-2.0 project license
+- `PROVENANCE.md`
+  - Reference-repo and publication audit notes
+- `CHANGELOG.md`
+  - Release notes
 
 ## Build And Validation
 
@@ -43,6 +51,12 @@ Keep the implementation focused on:
 
 ```bash
 ./gradlew build
+```
+
+- Auto-format Kotlin when needed with:
+
+```bash
+./gradlew ktlintFormat
 ```
 
 - Fat jar output:
@@ -113,6 +127,7 @@ Keep tool names stable unless there is a strong reason to break compatibility.
 - Preserve backward compatibility for MCP tool outputs when possible.
 - If you add new tools, also update `README.md`.
 - If you change auth behavior or redirect handling, update both `README.md` and this file.
+- `./gradlew build` includes linting; keep the tree clean under ktlint.
 
 ## Reference Workflow
 

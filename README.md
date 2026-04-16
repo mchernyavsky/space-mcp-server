@@ -2,6 +2,12 @@
 
 Kotlin MCP server for JetBrains Space code reviews and merge requests.
 
+## Requirements
+
+- Java 21
+- Access to a JetBrains Space instance such as `https://jetbrains.team`
+- Either a Space OAuth application for `space_authorize` or a Space access token for env-based local auth
+
 ## What It Supports
 
 - OAuth authorization code flow with PKCE against `https://jetbrains.team`
@@ -29,11 +35,48 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
 - Creating a code discussion anchored to a file/line
 - Replying to an existing discussion channel
 
+## Quick Start
+
+1. Build the server:
+
+   ```bash
+   ./gradlew build
+   ```
+
+   `build` includes tests and ktlint checks.
+
+2. Configure your MCP host to run the fat jar:
+
+   ```json
+   {
+     "mcpServers": {
+       "Space": {
+         "command": "java",
+         "args": [
+           "-jar",
+           "/path/to/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
+         ]
+       }
+     }
+   }
+   ```
+
+   If `java` is not Java 21 on your machine, use the absolute path to a Java 21 binary instead.
+
+3. Authenticate:
+   - set `SPACE_ACCESS_TOKEN` in the MCP host config for local non-interactive auth, or
+   - call `space_authorize` once to complete OAuth.
+
+4. Verify the integration with:
+   - `space_auth_status`
+   - `space_list_my_reviews`
+   - `space_get_review`
+   - `space_list_review_comments`
+
 ## Build
 
 ```bash
 ./gradlew build
-./gradlew shadowJar
 ```
 
 The runnable fat jar is created at:
@@ -112,6 +155,65 @@ Stored credentials are written to:
 - `$XDG_CONFIG_HOME/space-mcp-server/credentials.json`, or
 - `~/.config/space-mcp-server/credentials.json`
 
+## Common Tool Flow
+
+Check the current auth state:
+
+```json
+{ "name": "space_auth_status", "arguments": {} }
+```
+
+List your reviews:
+
+```json
+{
+  "name": "space_list_my_reviews",
+  "arguments": {
+    "projectKey": "FLEET",
+    "role": "both",
+    "limit": 20
+  }
+}
+```
+
+Fetch a review with commits and comments:
+
+```json
+{
+  "name": "space_get_review",
+  "arguments": {
+    "projectKey": "FLEET",
+    "review": "number:7705",
+    "includeCommits": true,
+    "includeComments": true
+  }
+}
+```
+
+Filter review comments by author:
+
+```json
+{
+  "name": "space_list_review_comments",
+  "arguments": {
+    "projectKey": "FLEET",
+    "review": "number:7705",
+    "author": "Mikhail.Chernyavsky"
+  }
+}
+```
+
+## Reset Local Auth State
+
+There is no dedicated logout tool.
+
+To reset locally stored OAuth credentials, delete:
+
+- `$XDG_CONFIG_HOME/space-mcp-server/credentials.json`, or
+- `~/.config/space-mcp-server/credentials.json`
+
+Environment-based auth can be reset by removing `SPACE_ACCESS_TOKEN` from the MCP host configuration.
+
 ## Exposed Tools
 
 - `space_auth_status`
@@ -141,3 +243,9 @@ Verified from local Space sources and SDK references:
 - A direct public "list my review participations" endpoint exists in source, but it is behind an internal HTTP API feature flag. This server does not depend on it.
 - A public `submitPendingMessages(reviewId)` HTTP endpoint was not confirmed. The server can create pending messages/discussions, but reliable publication of pending drafts is not implemented.
 - Cross-project "my reviews" is implemented by scanning visible projects and using public `author` and `reviewer` filters, not by a single dedicated public endpoint.
+
+## License
+
+This repository is licensed under Apache-2.0. See `LICENSE`.
+
+For publication and reference-repository audit notes, see `PROVENANCE.md`.
