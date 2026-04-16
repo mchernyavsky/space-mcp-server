@@ -43,15 +43,24 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
 
 ## Quick Start
 
-1. Build the server:
+1. Get the runnable fat jar in one of these ways:
 
-   ```bash
-   ./gradlew build
+   - Download it from [GitHub Releases](https://github.com/mchernyavsky/space-mcp-server/releases).
+   - Or build it from source:
+
+     ```bash
+     ./gradlew build
+     ```
+
+     `build` includes tests and ktlint checks.
+
+   In both cases, the file you want is the fat jar:
+
+   ```text
+   build/libs/space-mcp-server-0.1.0-all.jar
    ```
 
-   `build` includes tests and ktlint checks.
-
-2. Configure your MCP host to run the fat jar:
+2. Configure your MCP host to run that jar with `java -jar`:
 
    ```json
    {
@@ -102,6 +111,8 @@ build/libs/space-mcp-server-0.1.0-all.jar
 - Release runs build the server, publish a versioned fat jar plus `SHA256SUMS.txt` as workflow artifacts, and attach those files to the GitHub release.
 
 ## Run
+
+If you downloaded the release jar, run that file. If you built from source, run the jar from `build/libs`.
 
 ```bash
 java -jar build/libs/space-mcp-server-0.1.0-all.jar
