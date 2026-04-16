@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class SpaceApiParsingTest {
     private val json = Json {
@@ -86,5 +87,72 @@ class SpaceApiParsingTest {
         assertEquals("en very abuse: improve suggestions, cover more adjectives", commit.message)
         assertNotNull(commit.author)
         assertEquals("Anna Lander", commit.author.name)
+    }
+
+    @Test
+    fun `review summary resolves author from createdBy`() {
+        val payload = """
+            {
+              "className": "MergeRequestRecord",
+              "id": "30meQG4eKA1u",
+              "number": 200545,
+              "title": "AIR-4813",
+              "createdBy": {
+                "id": "3j5uoD3koYEa",
+                "username": "Mikhail.Chernyavsky",
+                "name": {
+                  "firstName": "Mikhail",
+                  "lastName": "Chernyavsky"
+                }
+              }
+            }
+        """.trimIndent()
+
+        val response = json.decodeFromString<ReviewSummary>(payload).normalized()
+
+        assertEquals("Mikhail.Chernyavsky", response.resolvedAuthor?.username)
+        assertEquals("3j5uoD3koYEa", response.resolvedAuthor?.id)
+    }
+
+    @Test
+    fun `feed sync batch accepts top level author`() {
+        val payload = """
+            {
+              "etag": "1669848753922",
+              "data": [
+                {
+                  "chatMessage": {
+                    "id": "Esgo60Vpp3W",
+                    "text": "test",
+                    "author": {
+                      "name": "Mikhail.Chernyavsky",
+                      "details": {
+                        "className": "CUserPrincipalDetails",
+                        "user": {
+                          "id": "3j5uoD3koYEa"
+                        }
+                      }
+                    },
+                    "details": {
+                      "className": "M2TextItemContent"
+                    },
+                    "created": {
+                      "iso": "2026-04-16T18:32:13.110Z",
+                      "timestamp": 1776364333110
+                    }
+                  }
+                }
+              ],
+              "hasMore": false
+            }
+        """.trimIndent()
+
+        val response = json.decodeFromString<SyncBatchResponse>(payload)
+        val message = response.data.single().chatMessage
+
+        assertNotNull(message)
+        assertEquals("test", message.text)
+        assertEquals("Mikhail.Chernyavsky", message.author?.name)
+        assertTrue(message.author?.matches("3j5uoD3koYEa") == true)
     }
 }
