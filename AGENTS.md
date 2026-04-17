@@ -30,9 +30,9 @@ Keep the implementation focused on:
 - `src/main/kotlin/team/jetbrains/mcp/space/SpaceAuthService.kt`
   - OAuth code flow, PKCE, token exchange, refresh
 - `src/main/kotlin/team/jetbrains/mcp/space/SpaceApiClient.kt`
-  - Raw Space HTTP client and review/chat operations
+  - Direct Space SDK calls, normalization, and MCP-facing orchestration
 - `src/main/kotlin/team/jetbrains/mcp/space/Models.kt`
-  - DTOs for MCP responses and Space payloads
+  - DTOs for MCP responses
 - `src/main/kotlin/team/jetbrains/mcp/space/SpaceCredentialStore.kt`
   - Local credential persistence
 - `.github/workflows/ci.yml`
@@ -83,7 +83,6 @@ http://localhost:63363/api/space/oauth/authorization_code
 - Local `stdio` clients can also bootstrap auth without OAuth by setting:
   - `SPACE_ACCESS_TOKEN`
   - optional `SPACE_SERVER_URL`
-  - optional `SPACE_API_BASE_URL`
   - optional `SPACE_SCOPE`
   - optional `SPACE_CLIENT_ID`
 - Credentials are stored under:
@@ -99,6 +98,7 @@ http://localhost:63363/api/space/oauth/authorization_code
 - `space_list_reviews`
 - `space_list_my_reviews`
 - `space_get_review`
+- `space_list_review_changes`
 - `space_list_review_comments`
 - `space_post_review_comment`
 - `space_create_code_discussion`
@@ -111,6 +111,9 @@ Keep tool names stable unless there is a strong reason to break compatibility.
 - Public review listing exists via `GET /projects/{project}/code-reviews`.
 - Public review details exist via `GET /projects/{project}/code-reviews/{reviewId}`.
 - Review commits are available via `GET /projects/{project}/code-reviews/{reviewId}/details`.
+- Review files are available via:
+  - `GET /projects/{project}/code-reviews/{reviewId}/merge-files`
+  - `GET /projects/{project}/code-reviews/{reviewId}/files`
 - Review comments are retrieved through the review `feedChannelId` and chat APIs.
 - Plain review-feed comments can carry author information directly on the chat message, while code-discussion roots and replies come through discussion channels. Keep both shapes wired.
 - Code discussion creation is supported via `POST /projects/{project}/code-reviews/code-discussions`.
@@ -124,8 +127,8 @@ Keep tool names stable unless there is a strong reason to break compatibility.
 
 ## Coding Notes
 
-- Prefer raw Ktor HTTP calls unless the Space Kotlin SDK clearly reduces complexity without losing endpoint coverage.
-- Keep DTOs permissive: `ignoreUnknownKeys = true` is intentional because Space payloads are broad and can evolve.
+- Prefer the published Space SDK for auth and public review/chat endpoints.
+- Keep custom DTOs focused on the MCP response contract. Do not reintroduce raw HTTP payload mirrors unless the SDK cannot cover the endpoint.
 - Preserve backward compatibility for MCP tool outputs when possible.
 - If you add new tools, also update `README.md`.
 - If you change auth behavior or redirect handling, update both `README.md` and this file.
@@ -137,7 +140,7 @@ When implementing new Space capabilities:
 
 1. Check whether the endpoint is actually public in local Space sources.
 2. Prefer project-scoped public APIs over internal feature-flagged endpoints.
-3. Add or extend DTOs in `Models.kt`.
-4. Add raw client support in `SpaceApiClient.kt`.
+3. Use the SDK directly through `SpaceApiClient.kt`.
+4. Add or extend DTOs in `Models.kt` only for MCP output shapes.
 5. Expose the capability in `SpaceMcpServer.kt`.
 6. Run `./gradlew build`.

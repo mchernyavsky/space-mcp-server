@@ -19,7 +19,6 @@ import kotlinx.serialization.json.jsonPrimitive
 @Serializable
 data class StoredCredentials(
     val serverUrl: String = SpaceAuthService.DEFAULT_SERVER_URL,
-    val apiBaseUrl: String = SpaceAuthService.defaultApiBaseUrl(SpaceAuthService.DEFAULT_SERVER_URL),
     val clientId: String? = null,
     val clientSecret: String? = null,
     val scope: String = SpaceAuthService.DEFAULT_SCOPE,
@@ -32,7 +31,6 @@ data class StoredCredentials(
 @Serializable
 data class OAuthAuthorizationResult(
     val serverUrl: String,
-    val apiBaseUrl: String,
     val redirectUri: String,
     val scope: String,
     val clientId: String,
@@ -45,7 +43,6 @@ data class AuthStatus(
     val configured: Boolean,
     val authenticated: Boolean,
     val serverUrl: String?,
-    val apiBaseUrl: String?,
     val clientId: String?,
     val scope: String?,
     val expiresAtEpochSeconds: Long?,
@@ -141,6 +138,7 @@ data class MergeRequestBranch(
 data class ReviewDetailsBundle(
     val review: ReviewSummary,
     val commits: List<ReviewCommitInReview> = emptyList(),
+    val changes: ReviewChangesPage? = null,
     val comments: ReviewCommentBundle? = null,
 )
 
@@ -151,6 +149,56 @@ data class ReviewCommentsResponse(
     val authorFilter: String? = null,
     val count: Int,
     val comments: List<ReviewCommentEntry> = emptyList(),
+)
+
+@Serializable
+data class ReviewChangesResponse(
+    val review: ReviewSummary,
+    val scope: String,
+    val count: Int,
+    val totalCount: Int? = null,
+    val hasMore: Boolean = false,
+    val next: String? = null,
+    val changes: List<ReviewChangeEntry> = emptyList(),
+)
+
+@Serializable
+data class ReviewChangesPage(
+    val scope: String,
+    val count: Int,
+    val totalCount: Int? = null,
+    val hasMore: Boolean = false,
+    val next: String? = null,
+    val changes: List<ReviewChangeEntry> = emptyList(),
+)
+
+@Serializable
+data class ReviewChangeEntry(
+    val kind: String,
+    val repository: String,
+    val path: String,
+    val oldPath: String? = null,
+    val revision: String? = null,
+    val changeType: String? = null,
+    val entryType: String? = null,
+    val conflicting: Boolean? = null,
+    val read: Boolean? = null,
+    val detached: Boolean? = null,
+    val constituentCommits: List<String> = emptyList(),
+    val baseId: String? = null,
+    val sourceId: String? = null,
+    val targetId: String? = null,
+    val oldBlobId: String? = null,
+    val newBlobId: String? = null,
+    val diffSize: ReviewDiffSize? = null,
+    val executable: Boolean? = null,
+    val lfs: Boolean? = null,
+)
+
+@Serializable
+data class ReviewDiffSize(
+    val added: Int? = null,
+    val deleted: Int? = null,
 )
 
 @Serializable
@@ -167,50 +215,6 @@ data class CrossProjectReview(
     val projectName: String? = null,
     val matchedRoles: List<String> = emptyList(),
     val review: ReviewSummary,
-)
-
-@Serializable
-data class RawReviewDetailsResponse(
-    val shortInfo: ReviewSummaryReference? = null,
-    val commits: List<RawReviewCommitGroup> = emptyList(),
-)
-
-@Serializable
-data class ReviewSummaryReference(
-    @SerialName("className")
-    val className: String? = null,
-    val id: String,
-    @Serializable(with = NullableSpaceKeyStringSerializer::class)
-    val key: String? = null,
-    val number: Int? = null,
-    val title: String? = null,
-)
-
-@Serializable
-data class RawReviewCommitGroup(
-    @SerialName("repository")
-    val repository: RepositoryInReview? = null,
-    val repositoryInReview: RepositoryInReview? = null,
-    val revisions: List<RawReviewCommitEntry> = emptyList(),
-    val commits: List<RawReviewCommitEntry> = emptyList(),
-    val commitWithGraph: RawCommitWithGraph? = null,
-)
-
-@Serializable
-data class RawReviewCommitEntry(
-    val repositoryName: String? = null,
-    val commit: ReviewCommit? = null,
-    val id: String? = null,
-    val message: String? = null,
-    val author: ReviewCommitAuthor? = null,
-    val timestamp: Long? = null,
-    val authorDate: Long? = null,
-    val commitDate: Long? = null,
-)
-
-@Serializable
-data class RawCommitWithGraph(
-    val commit: ReviewCommit? = null,
 )
 
 @Serializable
@@ -251,33 +255,6 @@ data class ReviewCommentBundle(
     val feedMessages: List<FeedMessage> = emptyList(),
     val codeDiscussions: List<CodeDiscussionThread> = emptyList(),
     val entries: List<ReviewCommentEntry> = emptyList(),
-)
-
-@Serializable
-data class SyncBatchResponse(
-    val data: List<SyncBatchItem> = emptyList(),
-    val etag: String? = null,
-    val hasMore: Boolean? = null,
-)
-
-@Serializable
-data class SyncBatchItem(
-    val chatMessage: SyncChatMessage? = null,
-)
-
-@Serializable
-data class SyncChatMessage(
-    val id: String,
-    val text: String? = null,
-    val created: Timestamp? = null,
-    val details: MessageDetails? = null,
-    val author: ChatAuthor? = null,
-    val projectedItem: ProjectedItem? = null,
-)
-
-@Serializable
-data class ProjectedItem(
-    val author: ChatAuthor? = null,
 )
 
 @Serializable
@@ -388,30 +365,6 @@ data class SentMessageResult(
     val channelId: String,
 )
 
-@Serializable
-data class GenericApiRecord(
-    val id: String,
-    val channel: ChannelReference? = null,
-    val pending: Boolean? = null,
-    val feedItemId: String? = null,
-    val anchor: DiscussionAnchor? = null,
-)
-
-@Serializable
-data class GenericChatMessageRecord(
-    val id: String,
-)
-
-internal fun RawReviewDetailsResponse.normalizedCommits(): List<ReviewCommitInReview> =
-    commits.map { group ->
-        ReviewCommitInReview(
-            repositoryInReview = group.repository ?: group.repositoryInReview,
-            revisions = group.revisions.mapNotNull { it.normalizedCommit() },
-            commits = group.commits.mapNotNull { it.normalizedCommit() },
-            commitWithGraph = group.commitWithGraph?.let { CommitWithGraph(commit = it.commit) },
-        )
-    }
-
 internal fun ReviewSummary.normalized(): ReviewSummary {
     val resolved =
         author
@@ -427,25 +380,6 @@ internal fun ChatAuthor.matches(filter: String): Boolean {
 }
 
 internal fun ChatAuthor.isUser(): Boolean = details?.user?.id != null || details?.className == "CUserPrincipalDetails"
-
-private fun RawReviewCommitEntry.normalizedCommit(): ReviewCommit? =
-    commit ?: if (
-        id != null ||
-        message != null ||
-        author != null ||
-        timestamp != null ||
-        authorDate != null ||
-        commitDate != null
-    ) {
-        ReviewCommit(
-            id = id,
-            message = message,
-            author = author,
-            timestamp = timestamp ?: authorDate ?: commitDate,
-        )
-    } else {
-        null
-    }
 
 object SpaceKeyStringSerializer : KSerializer<String> {
     override val descriptor: SerialDescriptor =

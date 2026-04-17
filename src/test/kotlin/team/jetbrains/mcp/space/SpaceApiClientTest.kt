@@ -149,6 +149,203 @@ class SpaceApiClientTest {
             assertTrue(requests.all { it.headers[HttpHeaders.Authorization] == "Bearer test-token" })
         }
 
+    @Test
+    fun `listReviewChanges returns normalized merge request files`() =
+        runBlocking {
+            val client =
+                testClient { request ->
+                    when (request.url.encodedPath) {
+                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
+                            respondJson(
+                                """
+                                {
+                                  "className": "MergeRequestRecord",
+                                  "id": "review-1",
+                                  "project": {
+                                    "key": "FLEET"
+                                  },
+                                  "number": 7705,
+                                  "title": "Test review",
+                                  "state": "Opened",
+                                  "createdAt": 1,
+                                  "timestamp": 2,
+                                  "feedChannelId": "feed-1",
+                                  "participants": [],
+                                  "branchPairs": [
+                                    {
+                                      "repository": "ultimate",
+                                      "sourceBranchInfo": {
+                                        "head": "source-head"
+                                      }
+                                    }
+                                  ],
+                                  "createdBy": {
+                                    "id": "author-1",
+                                    "username": "review.author",
+                                    "name": {
+                                      "firstName": "Review",
+                                      "lastName": "Author"
+                                    }
+                                  }
+                                }
+                                """.trimIndent(),
+                            )
+
+                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705/merge-files" ->
+                            respondJson(
+                                """
+                                {
+                                  "next": "",
+                                  "totalCount": 1,
+                                  "data": [
+                                    {
+                                      "name": "src/Main.kt",
+                                      "oldName": "src/App.kt",
+                                      "baseId": "base-1",
+                                      "sourceId": "source-blob",
+                                      "targetId": "target-blob",
+                                      "diffSize": {
+                                        "added": 12,
+                                        "deleted": 4
+                                      },
+                                      "entryType": "FILE",
+                                      "conflicting": false,
+                                      "properties": {
+                                        "lfs": false,
+                                        "executable": true
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.trimIndent(),
+                            )
+
+                        else -> error("Unexpected request path: ${request.url.encodedPath}")
+                    }
+                }
+
+            val response =
+                client.listReviewChanges(
+                    projectKey = "FLEET",
+                    reviewRef = "number:7705",
+                    limit = 100,
+                    offset = 0,
+                )
+            val change = response.changes.single()
+
+            assertEquals("merge-request-files", response.scope)
+            assertEquals(1, response.count)
+            assertEquals("ultimate", change.repository)
+            assertEquals("src/Main.kt", change.path)
+            assertEquals("src/App.kt", change.oldPath)
+            assertEquals("source-head", change.revision)
+            assertEquals("RENAMED", change.changeType)
+            assertEquals(12, change.diffSize?.added)
+        }
+
+    @Test
+    fun `listReviewChanges returns normalized code review files`() =
+        runBlocking {
+            val client =
+                testClient { request ->
+                    when (request.url.encodedPath) {
+                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
+                            respondJson(
+                                """
+                                {
+                                  "className": "CommitSetReviewRecord",
+                                  "id": "review-1",
+                                  "project": {
+                                    "key": "FLEET"
+                                  },
+                                  "number": 7705,
+                                  "title": "Test review",
+                                  "state": "Opened",
+                                  "createdAt": 1,
+                                  "timestamp": 2,
+                                  "feedChannelId": "feed-1",
+                                  "participants": [],
+                                  "createdBy": {
+                                    "id": "author-1",
+                                    "username": "review.author",
+                                    "name": {
+                                      "firstName": "Review",
+                                      "lastName": "Author"
+                                    }
+                                  }
+                                }
+                                """.trimIndent(),
+                            )
+
+                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705/files" ->
+                            respondJson(
+                                """
+                                {
+                                  "next": "",
+                                  "totalCount": 1,
+                                  "data": [
+                                    {
+                                      "repository": "ultimate",
+                                      "change": {
+                                        "changeType": "MODIFIED",
+                                        "revision": "revision-1",
+                                        "diffSize": {
+                                          "added": 7,
+                                          "deleted": 3
+                                        },
+                                        "path": "src/Main.kt",
+                                        "detached": false,
+                                        "constituentCommits": ["c1", "c2"],
+                                        "old": {
+                                          "path": "src/App.kt",
+                                          "blob": "old-blob",
+                                          "type": "FILE",
+                                          "properties": {
+                                            "lfs": false,
+                                            "executable": false
+                                          }
+                                        },
+                                        "new": {
+                                          "path": "src/Main.kt",
+                                          "blob": "new-blob",
+                                          "type": "FILE",
+                                          "properties": {
+                                            "lfs": false,
+                                            "executable": true
+                                          }
+                                        }
+                                      },
+                                      "read": true
+                                    }
+                                  ]
+                                }
+                                """.trimIndent(),
+                            )
+
+                        else -> error("Unexpected request path: ${request.url.encodedPath}")
+                    }
+                }
+
+            val response =
+                client.listReviewChanges(
+                    projectKey = "FLEET",
+                    reviewRef = "number:7705",
+                    limit = 100,
+                    offset = 0,
+                )
+            val change = response.changes.single()
+
+            assertEquals("code-review-files", response.scope)
+            assertEquals(1, response.count)
+            assertEquals("ultimate", change.repository)
+            assertEquals("src/Main.kt", change.path)
+            assertEquals("src/App.kt", change.oldPath)
+            assertEquals("revision-1", change.revision)
+            assertEquals("MODIFIED", change.changeType)
+            assertEquals(listOf("c1", "c2"), change.constituentCommits)
+            assertTrue(change.read == true)
+        }
+
     private fun testClient(handler: MockRequestHandler): SpaceApiClient {
         val credentialStore = SpaceCredentialStore(Files.createTempDirectory("space-mcp-server-test"))
         credentialStore.save(StoredCredentials(accessToken = "test-token"))

@@ -203,7 +203,10 @@ class SpaceMcpServer {
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
                 )
                 booleanProperty("includeCommits", "Include commit details. Defaults to true.")
+                booleanProperty("includeChanges", "Include changed file details. Defaults to false.")
                 booleanProperty("includeComments", "Include feed comments and code discussions. Defaults to true.")
+                numberProperty("changeLimit", "Maximum number of changed files to fetch when includeChanges is true. Defaults to 200.")
+                numberProperty("changeOffset", "Pagination offset for changed files when includeChanges is true. Defaults to 0.")
                 numberProperty("discussionReplyLimit", "Maximum replies to fetch per discussion thread. Defaults to 50.")
                 numberProperty("feedBatchSize", "Maximum feed messages to fetch per sync batch. Defaults to 100.")
                 numberProperty("feedBatchLimit", "Maximum number of feed sync batches to fetch. Defaults to 50.")
@@ -213,10 +216,37 @@ class SpaceMcpServer {
                 projectKey = arguments.requiredString("projectKey"),
                 reviewRef = arguments.requiredString("review"),
                 includeCommits = arguments.optionalBoolean("includeCommits") ?: true,
+                includeChanges = arguments.optionalBoolean("includeChanges") ?: false,
                 includeComments = arguments.optionalBoolean("includeComments") ?: true,
+                changeLimit = arguments.optionalInt("changeLimit") ?: 200,
+                changeOffset = arguments.optionalInt("changeOffset") ?: 0,
                 discussionReplyLimit = arguments.optionalInt("discussionReplyLimit") ?: 50,
                 feedBatchSize = arguments.optionalInt("feedBatchSize") ?: 100,
                 feedBatchLimit = arguments.optionalInt("feedBatchLimit") ?: 50,
+            )
+        }
+
+        server.registerTool(
+            name = "space_list_review_changes",
+            description =
+                "List changed files in a Space merge request or code review. " +
+                    "Returns normalized repository, path, revision, diff size, and file metadata.",
+            required = listOf("projectKey", "review"),
+            properties = {
+                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty(
+                    "review",
+                    "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
+                )
+                numberProperty("limit", "Maximum number of changed files to return. Defaults to 200.")
+                numberProperty("offset", "Pagination offset. Defaults to 0.")
+            },
+        ) { arguments ->
+            apiClient.listReviewChanges(
+                projectKey = arguments.requiredString("projectKey"),
+                reviewRef = arguments.requiredString("review"),
+                limit = arguments.optionalInt("limit") ?: 200,
+                offset = arguments.optionalInt("offset") ?: 0,
             )
         }
 

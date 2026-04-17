@@ -33,9 +33,16 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
   - resolved review author / creator details when available
   - branch information
   - commits
+  - optionally changed files
   - review feed messages
   - flattened human-authored comments
   - code discussion threads and replies
+- Listing changed files in a review or merge request with normalized:
+  - repository
+  - path / old path
+  - revision
+  - diff size
+  - conflict / read metadata when available
 - Listing human-authored review comments with optional author filtering
 - Posting a plain review comment to the main review feed
 - Creating a code discussion anchored to a file/line
@@ -90,6 +97,7 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
    - `space_auth_status`
    - `space_list_my_reviews`
    - `space_get_review`
+   - `space_list_review_changes`
    - `space_list_review_comments`
 
 ## Build
@@ -139,7 +147,6 @@ Set these environment variables in the MCP host configuration:
 
 - `SPACE_ACCESS_TOKEN`
 - `SPACE_SERVER_URL` for your Space organization URL, for example `https://jetbrains.team`
-- optional `SPACE_API_BASE_URL` (defaults to `<SPACE_SERVER_URL>/api/http`)
 - optional `SPACE_SCOPE`
 - optional `SPACE_CLIENT_ID`
 
@@ -257,6 +264,7 @@ Fetch a review with commits and comments:
     "projectKey": "FLEET",
     "review": "number:7705",
     "includeCommits": true,
+    "includeChanges": true,
     "includeComments": true
   }
 }
@@ -288,6 +296,17 @@ Example response excerpt:
       ]
     }
   ],
+  "changes": {
+    "scope": "merge-request-files",
+    "changes": [
+      {
+        "repository": "ultimate",
+        "path": "src/Main.kt",
+        "changeType": "MODIFIED",
+        "revision": "source-head-sha"
+      }
+    ]
+  },
   "comments": {
     "entries": [
       {
@@ -299,6 +318,46 @@ Example response excerpt:
       }
     ]
   }
+}
+```
+
+List changed files in a review:
+
+```json
+{
+  "name": "space_list_review_changes",
+  "arguments": {
+    "projectKey": "FLEET",
+    "review": "number:7705",
+    "limit": 100
+  }
+}
+```
+
+Example response:
+
+```json
+{
+  "review": {
+    "number": 7705,
+    "title": "[air] WIP AIR-4493 introduce tree-like changes structure"
+  },
+  "scope": "merge-request-files",
+  "count": 1,
+  "changes": [
+    {
+      "kind": "merge-request-file",
+      "repository": "ultimate",
+      "path": "src/Main.kt",
+      "oldPath": "src/App.kt",
+      "revision": "source-head-sha",
+      "changeType": "RENAMED",
+      "diffSize": {
+        "added": 12,
+        "deleted": 4
+      }
+    }
+  ]
 }
 ```
 
@@ -356,6 +415,7 @@ Environment-based auth can be reset by removing `SPACE_ACCESS_TOKEN` from the MC
 - `space_list_reviews`
 - `space_list_my_reviews`
 - `space_get_review`
+- `space_list_review_changes`
 - `space_list_review_comments`
 - `space_post_review_comment`
 - `space_create_code_discussion`
@@ -368,6 +428,9 @@ Verified from local Space sources and SDK references:
 - Public review listing endpoint exists: `GET /projects/{project}/code-reviews`
 - Public review details endpoint exists: `GET /projects/{project}/code-reviews/{reviewId}`
 - Public review details-with-commits endpoint exists: `GET /projects/{project}/code-reviews/{reviewId}/details`
+- Public review-file endpoints exist:
+  - `GET /projects/{project}/code-reviews/{reviewId}/merge-files`
+  - `GET /projects/{project}/code-reviews/{reviewId}/files`
 - Review comments are accessible through the review `feedChannelId` plus chat APIs
 - Public code discussion creation endpoint exists: `POST /projects/{project}/code-reviews/code-discussions`
 - Public chat message endpoints exist for discussion replies and main review-feed comments
