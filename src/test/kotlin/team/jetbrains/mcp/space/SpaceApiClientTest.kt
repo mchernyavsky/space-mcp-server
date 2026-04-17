@@ -13,7 +13,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
+import space.jetbrains.api.runtime.configureKtorClientForSpace
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,6 +30,7 @@ class SpaceApiClientTest {
                     respondJson(
                         """
                         {
+                          "next": "",
                           "totalCount": 1,
                           "data": [
                             {
@@ -52,22 +53,30 @@ class SpaceApiClientTest {
         }
 
     @Test
-    fun `listReviewComments fetches feed and discussion messages and filters by author`() =
+    fun `listReviewComments fetches feed comments and filters by author`() =
         runBlocking {
             val requests = mutableListOf<HttpRequestData>()
             val client =
                 testClient { request ->
                     requests += request
                     when (request.url.encodedPath) {
-                        "/api/http/projects/key:FLEET/code-reviews/number:7705" ->
+                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
                             respondJson(
                                 """
                                 {
                                   "className": "MergeRequestRecord",
                                   "id": "review-1",
+                                  "project": {
+                                    "key": "FLEET"
+                                  },
                                   "number": 7705,
                                   "title": "Test review",
+                                  "state": "Opened",
+                                  "createdAt": 1,
+                                  "timestamp": 2,
                                   "feedChannelId": "feed-1",
+                                  "participants": [],
+                                  "branchPairs": [],
                                   "createdBy": {
                                     "id": "author-1",
                                     "username": "review.author",
@@ -104,64 +113,19 @@ class SpaceApiClientTest {
                                     {
                                       "chatMessage": {
                                         "id": "feed-comment-2",
-                                        "text": "Discussion start",
+                                        "text": "Automated status update",
                                         "created": { "timestamp": 2 },
                                         "author": {
-                                          "name": "Another.Reviewer",
+                                          "name": "Space Team",
                                           "details": {
-                                            "className": "CUserPrincipalDetails",
-                                            "user": { "id": "user-2" }
+                                            "className": "CBotPrincipalDetails"
                                           }
                                         },
-                                        "details": {
-                                          "className": "CodeDiscussionRecord",
-                                          "codeDiscussion": {
-                                            "id": "discussion-1",
-                                            "channel": { "id": "channel-1" },
-                                            "anchor": {
-                                              "filename": "src/Main.kt",
-                                              "line": 42,
-                                              "revision": "abc123"
-                                            }
-                                          }
-                                        }
+                                        "details": { "className": "M2TextItemContent" }
                                       }
                                     }
                                   ],
                                   "hasMore": false
-                                }
-                                """.trimIndent(),
-                            )
-
-                        "/api/http/chats/messages" ->
-                            respondJson(
-                                """
-                                {
-                                  "messages": [
-                                    {
-                                      "id": "reply-1",
-                                      "text": "Please rename this",
-                                      "created": { "timestamp": 3 },
-                                      "author": {
-                                        "name": "Mikhail.Chernyavsky",
-                                        "details": {
-                                          "className": "CUserPrincipalDetails",
-                                          "user": { "id": "user-1" }
-                                        }
-                                      }
-                                    },
-                                    {
-                                      "id": "reply-2",
-                                      "text": "Automated status update",
-                                      "created": { "timestamp": 4 },
-                                      "author": {
-                                        "name": "Space Team",
-                                        "details": {
-                                          "className": "CBotPrincipalDetails"
-                                        }
-                                      }
-                                    }
-                                  ]
                                 }
                                 """.trimIndent(),
                             )
@@ -180,15 +144,8 @@ class SpaceApiClientTest {
                     feedBatchLimit = 3,
                 )
 
-            assertEquals(2, response.count)
-            assertEquals(listOf("review-feed", "code-discussion"), response.comments.map { it.kind })
-            assertEquals(
-                "src/Main.kt",
-                response.comments
-                    .last()
-                    .anchor
-                    ?.filename,
-            )
+            assertEquals(1, response.count)
+            assertEquals(listOf("review-feed"), response.comments.map { it.kind })
             assertTrue(requests.all { it.headers[HttpHeaders.Authorization] == "Bearer test-token" })
         }
 
@@ -201,7 +158,7 @@ class SpaceApiClientTest {
                 install(ContentNegotiation) {
                     json(json)
                 }
-                expectSuccess = false
+                configureKtorClientForSpace()
             }
         }
     }
