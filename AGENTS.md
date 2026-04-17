@@ -64,7 +64,7 @@ Keep the implementation focused on:
 - Fat jar output:
 
 ```text
-build/libs/space-mcp-server-0.1.0-all.jar
+build/libs/space-mcp-server-0.2.0-all.jar
 ```
 
 When changing build logic, auth flow, MCP registration, or DTOs, run `./gradlew build` before finishing.
