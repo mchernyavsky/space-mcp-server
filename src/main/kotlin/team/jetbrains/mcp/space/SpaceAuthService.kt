@@ -149,7 +149,6 @@ class SpaceAuthService(
             val stored =
                 StoredCredentials(
                     serverUrl = normalizedServerUrl,
-                    apiBaseUrl = defaultApiBaseUrl(normalizedServerUrl),
                     clientId = clientId,
                     clientSecret = clientSecret,
                     scope = scope,
@@ -162,7 +161,6 @@ class SpaceAuthService(
 
             OAuthAuthorizationResult(
                 serverUrl = stored.serverUrl,
-                apiBaseUrl = stored.apiBaseUrl,
                 redirectUri = callbackConfig.uri.toString(),
                 scope = scope,
                 clientId = clientId,
@@ -175,8 +173,6 @@ class SpaceAuthService(
         const val DEFAULT_SERVER_URL = "https://jetbrains.team"
         const val DEFAULT_SCOPE = "**"
         const val DEFAULT_REDIRECT_URI = "http://localhost:63363/api/space/oauth/authorization_code"
-
-        fun defaultApiBaseUrl(serverUrl: String): String = "${serverUrl.trimEnd('/')}/api/http"
     }
 }
 
@@ -201,14 +197,9 @@ internal fun environmentCredentials(stored: StoredCredentials?): StoredCredentia
         readEnv("SPACE_SERVER_URL")?.trimEnd('/')
             ?: stored?.serverUrl
             ?: SpaceAuthService.DEFAULT_SERVER_URL
-    val apiBaseUrl =
-        readEnv("SPACE_API_BASE_URL")?.trimEnd('/')
-            ?: stored?.apiBaseUrl
-            ?: SpaceAuthService.defaultApiBaseUrl(serverUrl)
 
     return StoredCredentials(
         serverUrl = serverUrl,
-        apiBaseUrl = apiBaseUrl,
         clientId = readEnv("SPACE_CLIENT_ID") ?: stored?.clientId,
         clientSecret = stored?.clientSecret,
         scope = readEnv("SPACE_SCOPE") ?: stored?.scope ?: SpaceAuthService.DEFAULT_SCOPE,
@@ -248,7 +239,6 @@ private fun buildAuthStatus(
         configured = credentials != null,
         authenticated = authenticated,
         serverUrl = credentials?.serverUrl,
-        apiBaseUrl = credentials?.apiBaseUrl,
         clientId = credentials?.clientId,
         scope = credentials?.scope,
         expiresAtEpochSeconds = credentials?.expiresAtEpochSeconds,
