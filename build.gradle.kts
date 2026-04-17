@@ -11,12 +11,14 @@ version = "0.1.0"
 
 repositories {
     mavenCentral()
+    maven("https://maven.pkg.jetbrains.space/public/p/space-sdk/maven")
 }
 
-val ktorVersion = "3.4.2"
+val ktorVersion = "3.3.3"
 val coroutinesVersion = "1.10.2"
 val serializationVersion = "1.11.0"
 val mcpVersion = "0.11.1"
+val spaceSdkVersion = "168099"
 val kotlinLoggingVersion = "8.0.01"
 val slf4jVersion = "2.0.17"
 
@@ -31,6 +33,7 @@ application {
 dependencies {
     implementation("io.modelcontextprotocol:kotlin-sdk-jvm:$mcpVersion")
     implementation("io.modelcontextprotocol:kotlin-sdk-server-jvm:$mcpVersion")
+    implementation("org.jetbrains:space-sdk-jvm:$spaceSdkVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")

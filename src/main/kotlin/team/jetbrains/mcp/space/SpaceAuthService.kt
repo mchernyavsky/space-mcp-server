@@ -2,28 +2,19 @@ package team.jetbrains.mcp.space
 
 import com.sun.net.httpserver.HttpServer
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.Parameters
-import io.ktor.http.isSuccess
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import space.jetbrains.api.runtime.OAuthAccessType
+import space.jetbrains.api.runtime.OAuthRequestCredentials
+import space.jetbrains.api.runtime.PermissionScope
+import space.jetbrains.api.runtime.Space
+import space.jetbrains.api.runtime.SpaceAppInstance
+import space.jetbrains.api.runtime.ktorClientForSpace
 import java.awt.Desktop
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.time.Instant
-import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
@@ -61,6 +52,12 @@ class SpaceAuthService(
         withContext(Dispatchers.IO) {
             val normalizedServerUrl = serverUrl.trimEnd('/')
             val callbackConfig = parseRedirectConfig(redirectUri)
+            val appInstance =
+                if (clientSecret.isNullOrBlank()) {
+                    SpaceAppInstance.withoutSecret(clientId, normalizedServerUrl)
+                } else {
+                    SpaceAppInstance(clientId, clientSecret, normalizedServerUrl)
+                }
 
             val redirectServer =
                 HttpServer.create(
@@ -70,7 +67,7 @@ class SpaceAuthService(
             redirectServer.executor = Executors.newSingleThreadExecutor()
 
             val state = UUID.randomUUID().toString()
-            val codeVerifier = generateCodeVerifier()
+            val codeVerifier = Space.generateCodeVerifier()
             val callback = CompletableFuture<AuthorizationCallback>()
 
             redirectServer.createContext(callbackConfig.path) { exchange ->
@@ -116,12 +113,13 @@ class SpaceAuthService(
 
             redirectServer.start()
             val authUrl =
-                buildAuthorizationUrl(
-                    serverUrl = normalizedServerUrl,
-                    clientId = clientId,
-                    redirectUri = redirectUri,
+                Space.authCodeSpaceUrl(
+                    appInstance = appInstance,
+                    scope = PermissionScope.fromString(scope),
                     state = state,
-                    scope = scope,
+                    redirectUri = redirectUri,
+                    requestCredentials = OAuthRequestCredentials.DEFAULT,
+                    accessType = OAuthAccessType.OFFLINE,
                     codeVerifier = codeVerifier,
                 )
 
@@ -139,18 +137,15 @@ class SpaceAuthService(
 
             val tokenInfo =
                 createAuthHttpClient().use { client ->
-                    exchangeCodeForTokens(
-                        client = client,
-                        serverUrl = normalizedServerUrl,
-                        clientId = clientId,
-                        clientSecret = clientSecret,
-                        authorizationCode = authorizationCode,
+                    Space.exchangeAuthCodeForToken(
+                        ktorClient = client,
+                        appInstance = appInstance,
+                        authCode = authorizationCode,
                         redirectUri = redirectUri,
                         codeVerifier = codeVerifier,
                     )
                 }
 
-            val expiresAt = tokenInfo.expiresIn?.let { Instant.now().plusSeconds(it.toLong()).epochSecond }
             val stored =
                 StoredCredentials(
                     serverUrl = normalizedServerUrl,
@@ -161,7 +156,7 @@ class SpaceAuthService(
                     redirectUri = callbackConfig.uri.toString(),
                     accessToken = tokenInfo.accessToken,
                     refreshToken = tokenInfo.refreshToken,
-                    expiresAtEpochSeconds = expiresAt,
+                    expiresAtEpochSeconds = tokenInfo.expires?.epochSeconds,
                 )
             credentialStore.save(stored)
 
@@ -172,7 +167,7 @@ class SpaceAuthService(
                 scope = scope,
                 clientId = clientId,
                 hasClientSecret = clientSecret != null,
-                expiresAtEpochSeconds = expiresAt,
+                expiresAtEpochSeconds = stored.expiresAtEpochSeconds,
             )
         }
 
@@ -189,63 +184,11 @@ class AuthorizationRequiredException(
     message: String,
 ) : IllegalStateException(message)
 
-@Serializable
-private data class OAuthTokenResponse(
-    @SerialName("access_token")
-    val accessToken: String,
-    @SerialName("refresh_token")
-    val refreshToken: String? = null,
-    @SerialName("expires_in")
-    val expiresIn: Int? = null,
-)
-
 private data class AuthorizationCallback(
     val code: String,
 )
 
-internal fun createAuthHttpClient(): HttpClient =
-    HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-        expectSuccess = false
-    }
-
-internal suspend fun refreshAccessToken(credentials: StoredCredentials): StoredCredentials {
-    val refreshToken =
-        credentials.refreshToken
-            ?: throw AuthorizationRequiredException("No refresh token is stored. Run the space_authorize tool again.")
-    val clientId =
-        credentials.clientId
-            ?: throw AuthorizationRequiredException("No Space client ID is stored. Run the space_authorize tool again.")
-
-    val tokenInfo =
-        createAuthHttpClient().use { client ->
-            try {
-                requestOAuthToken(
-                    client = client,
-                    serverUrl = credentials.serverUrl,
-                    clientId = clientId,
-                    clientSecret = credentials.clientSecret,
-                    formParameters =
-                        Parameters.build {
-                            append("grant_type", "refresh_token")
-                            append("refresh_token", refreshToken)
-                            append("scope", credentials.scope)
-                        },
-                )
-            } catch (e: IllegalStateException) {
-                throw AuthorizationRequiredException("Failed to refresh the Space access token: ${e.message}")
-            }
-        }
-
-    val expiresAt = tokenInfo.expiresIn?.let { Instant.now().plusSeconds(it.toLong()).epochSecond }
-    return credentials.copy(
-        accessToken = tokenInfo.accessToken,
-        refreshToken = tokenInfo.refreshToken ?: refreshToken,
-        expiresAtEpochSeconds = expiresAt,
-    )
-}
+internal fun createAuthHttpClient(): HttpClient = ktorClientForSpace()
 
 internal fun resolveConfiguredCredentials(credentialStore: SpaceCredentialStore): StoredCredentials? {
     val stored = credentialStore.load()
@@ -276,65 +219,6 @@ internal fun environmentCredentials(stored: StoredCredentials?): StoredCredentia
     )
 }
 
-private suspend fun exchangeCodeForTokens(
-    client: HttpClient,
-    serverUrl: String,
-    clientId: String,
-    clientSecret: String?,
-    authorizationCode: String,
-    redirectUri: String,
-    codeVerifier: String,
-): OAuthTokenResponse =
-    requestOAuthToken(
-        client = client,
-        serverUrl = serverUrl,
-        clientId = clientId,
-        clientSecret = clientSecret,
-        formParameters =
-            Parameters.build {
-                append("grant_type", "authorization_code")
-                append("code", authorizationCode)
-                append("redirect_uri", redirectUri)
-                append("code_verifier", codeVerifier)
-            },
-    )
-
-private fun buildAuthorizationUrl(
-    serverUrl: String,
-    clientId: String,
-    redirectUri: String,
-    state: String,
-    scope: String,
-    codeVerifier: String,
-): String {
-    val codeChallenge = createCodeChallenge(codeVerifier)
-    return buildString {
-        append(serverUrl.trimEnd('/'))
-        append("/oauth/auth?")
-        append("response_type=code")
-        append("&state=").append(urlEncode(state))
-        append("&redirect_uri=").append(urlEncode(redirectUri))
-        append("&request_credentials=default")
-        append("&client_id=").append(urlEncode(clientId))
-        append("&scope=").append(urlEncode(scope))
-        append("&access_type=offline")
-        append("&code_challenge=").append(urlEncode(codeChallenge))
-        append("&code_challenge_method=S256")
-    }
-}
-
-private fun generateCodeVerifier(): String {
-    val bytes = ByteArray(32)
-    SecureRandom().nextBytes(bytes)
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-}
-
-private fun createCodeChallenge(codeVerifier: String): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hashed = digest.digest(codeVerifier.toByteArray(StandardCharsets.US_ASCII))
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hashed)
-}
-
 private fun parseQuery(query: String): Map<String, String> {
     if (query.isBlank()) return emptyMap()
     return query
@@ -346,8 +230,6 @@ private fun parseQuery(query: String): Map<String, String> {
             key to value
         }.toMap()
 }
-
-private fun urlEncode(value: String): String = java.net.URLEncoder.encode(value, StandardCharsets.UTF_8)
 
 private fun escapeHtml(value: String): String =
     value
@@ -388,62 +270,6 @@ private fun parseRedirectConfig(redirectUri: String): RedirectConfig {
         host = host,
         port = port,
         path = path,
-    )
-}
-
-private suspend fun requestOAuthToken(
-    client: HttpClient,
-    serverUrl: String,
-    clientId: String,
-    clientSecret: String?,
-    formParameters: Parameters,
-): OAuthTokenResponse {
-    val response =
-        client.submitForm(
-            url = "${serverUrl.trimEnd('/')}/oauth/token",
-            formParameters = withClientId(formParameters, clientId, clientSecret),
-        ) {
-            basicAuthorization(clientId, clientSecret)
-        }
-
-    if (!response.status.isSuccess()) {
-        throw IllegalStateException("${response.status.value} ${response.bodyAsText()}")
-    }
-
-    return response.body()
-}
-
-private fun withClientId(
-    formParameters: Parameters,
-    clientId: String,
-    clientSecret: String?,
-): Parameters {
-    if (clientSecret != null) {
-        return formParameters
-    }
-
-    return Parameters.build {
-        formParameters.forEach { key, values ->
-            values.forEach { value -> append(key, value) }
-        }
-        append("client_id", clientId)
-    }
-}
-
-private fun io.ktor.client.request.HttpRequestBuilder.basicAuthorization(
-    clientId: String,
-    clientSecret: String?,
-) {
-    if (clientSecret == null) {
-        return
-    }
-
-    headers.append(
-        "Authorization",
-        "Basic " +
-            Base64
-                .getEncoder()
-                .encodeToString("$clientId:$clientSecret".toByteArray(StandardCharsets.UTF_8)),
     )
 }
 
