@@ -21,14 +21,14 @@ class SpaceApiParsingTest {
               "data": [
                 {
                   "id": "1WphxW057gQL",
-                  "key": { "key": "FLEET" },
-                  "name": "Fleet",
+                  "key": { "key": "ALDERAAN" },
+                  "name": "Alderaan Defense Grid",
                   "private": false
                 },
                 {
                   "id": "1tCDp10O9Jum",
-                  "key": { "key": "GRAZI" },
-                  "name": "JetBrains AI",
+                  "key": { "key": "GOTHAM" },
+                  "name": "Gotham City Watch",
                   "private": false
                 }
               ]
@@ -37,7 +37,7 @@ class SpaceApiParsingTest {
 
         val response = json.decodeFromString<BatchResponse<ProjectSummary>>(payload)
 
-        assertEquals(listOf("FLEET", "GRAZI"), response.data.map { it.key })
+        assertEquals(listOf("ALDERAAN", "GOTHAM"), response.data.map { it.key })
         assertEquals(2, response.totalCount)
     }
 
@@ -48,14 +48,14 @@ class SpaceApiParsingTest {
             {
               "className": "MergeRequestRecord",
               "id": "30meQG4eKA1u",
-              "number": 200545,
-              "title": "AIR-4813",
+              "number": 1138,
+              "title": "[falcon] Tune hyperdrive ignition timing",
               "createdBy": {
-                "id": "3j5uoD3koYEa",
-                "username": "Mikhail.Chernyavsky",
+                "id": "hero-001",
+                "username": "Leia.Organa",
                 "name": {
-                  "firstName": "Mikhail",
-                  "lastName": "Chernyavsky"
+                  "firstName": "Leia",
+                  "lastName": "Organa"
                 }
               }
             }
@@ -63,7 +63,7 @@ class SpaceApiParsingTest {
 
         val response = json.decodeFromString<ReviewSummary>(payload).normalized()
 
-        assertEquals("Mikhail.Chernyavsky", response.resolvedAuthor?.username)
-        assertEquals("3j5uoD3koYEa", response.resolvedAuthor?.id)
+        assertEquals("Leia.Organa", response.resolvedAuthor?.username)
+        assertEquals("hero-001", response.resolvedAuthor?.id)
     }
 }

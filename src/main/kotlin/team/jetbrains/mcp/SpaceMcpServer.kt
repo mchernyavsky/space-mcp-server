@@ -126,7 +126,7 @@ class SpaceMcpServer {
             description = "List merge requests and code reviews in a Space project. Supports author and reviewer filters, including me.",
             required = listOf("projectKey"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty("repository", "Optional repository name filter.")
                 stringProperty("state", "Optional state filter. Examples: Opened, Closed, Merged, NeedsReview, RequiresAuthorAttention.")
                 stringProperty("type", "Optional review type filter. Examples: MergeRequest, CommitSetReview.")
@@ -197,7 +197,7 @@ class SpaceMcpServer {
                     "feed comments, flattened human comments, and code discussion threads.",
             required = listOf("projectKey", "review"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty(
                     "review",
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
@@ -233,7 +233,7 @@ class SpaceMcpServer {
                     "Returns normalized repository, path, revision, diff size, and file metadata.",
             required = listOf("projectKey", "review"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty(
                     "review",
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
@@ -257,7 +257,7 @@ class SpaceMcpServer {
                     "Supports optional filtering by author username or user id.",
             required = listOf("projectKey", "review"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty(
                     "review",
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
@@ -283,7 +283,7 @@ class SpaceMcpServer {
             description = "Post a plain text message to the main review feed channel.",
             required = listOf("projectKey", "review", "text"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty(
                     "review",
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",
@@ -305,7 +305,7 @@ class SpaceMcpServer {
             description = "Create a new code discussion anchored to a file and line in a Space review.",
             required = listOf("projectKey", "review", "repository", "revision", "filename", "text"),
             properties = {
-                stringProperty("projectKey", "Space project key, for example IJ.")
+                stringProperty("projectKey", "Space project key, for example ALDERAAN.")
                 stringProperty(
                     "review",
                     "Review identifier. Accepts raw Space id, id:<id>, number:<n>, key:<key>, or a plain integer review number.",

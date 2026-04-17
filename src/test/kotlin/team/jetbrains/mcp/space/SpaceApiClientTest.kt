@@ -35,8 +35,8 @@ class SpaceApiClientTest {
                           "data": [
                             {
                               "id": "1WphxW057gQL",
-                              "key": { "key": "FLEET" },
-                              "name": "Fleet",
+                              "key": { "key": "ALDERAAN" },
+                              "name": "Alderaan Defense Grid",
                               "private": false
                             }
                           ]
@@ -47,7 +47,7 @@ class SpaceApiClientTest {
 
             val response = client.listProjects(term = null, limit = 50, offset = 0)
 
-            assertEquals(listOf("FLEET"), response.data.map { it.key })
+            assertEquals(listOf("ALDERAAN"), response.data.map { it.key })
             assertEquals("Bearer test-token", requests.single().headers[HttpHeaders.Authorization])
             assertEquals("/api/http/projects", requests.single().url.encodedPath)
         }
@@ -60,17 +60,17 @@ class SpaceApiClientTest {
                 testClient { request ->
                     requests += request
                     when (request.url.encodedPath) {
-                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
+                        "/api/http/projects/key%3AALDERAAN/code-reviews/number%3A1138" ->
                             respondJson(
                                 """
                                 {
                                   "className": "MergeRequestRecord",
                                   "id": "review-1",
                                   "project": {
-                                    "key": "FLEET"
+                                    "key": "ALDERAAN"
                                   },
-                                  "number": 7705,
-                                  "title": "Test review",
+                                  "number": 1138,
+                                  "title": "[falcon] Tune hyperdrive ignition timing",
                                   "state": "Opened",
                                   "createdAt": 1,
                                   "timestamp": 2,
@@ -79,10 +79,10 @@ class SpaceApiClientTest {
                                   "branchPairs": [],
                                   "createdBy": {
                                     "id": "author-1",
-                                    "username": "review.author",
+                                    "username": "Han.Solo",
                                     "name": {
-                                      "firstName": "Review",
-                                      "lastName": "Author"
+                                      "firstName": "Han",
+                                      "lastName": "Solo"
                                     }
                                   }
                                 }
@@ -101,7 +101,7 @@ class SpaceApiClientTest {
                                         "text": "Looks good",
                                         "created": { "timestamp": 1 },
                                         "author": {
-                                          "name": "Mikhail.Chernyavsky",
+                                          "name": "Leia.Organa",
                                           "details": {
                                             "className": "CUserPrincipalDetails",
                                             "user": { "id": "user-1" }
@@ -136,9 +136,9 @@ class SpaceApiClientTest {
 
             val response =
                 client.listReviewComments(
-                    projectKey = "FLEET",
-                    reviewRef = "number:7705",
-                    author = "Mikhail.Chernyavsky",
+                    projectKey = "ALDERAAN",
+                    reviewRef = "number:1138",
+                    author = "Leia.Organa",
                     discussionReplyLimit = 20,
                     feedBatchSize = 100,
                     feedBatchLimit = 3,
@@ -155,17 +155,17 @@ class SpaceApiClientTest {
             val client =
                 testClient { request ->
                     when (request.url.encodedPath) {
-                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
+                        "/api/http/projects/key%3AALDERAAN/code-reviews/number%3A1138" ->
                             respondJson(
                                 """
                                 {
                                   "className": "MergeRequestRecord",
                                   "id": "review-1",
                                   "project": {
-                                    "key": "FLEET"
+                                    "key": "ALDERAAN"
                                   },
-                                  "number": 7705,
-                                  "title": "Test review",
+                                  "number": 1138,
+                                  "title": "[falcon] Tune hyperdrive ignition timing",
                                   "state": "Opened",
                                   "createdAt": 1,
                                   "timestamp": 2,
@@ -173,7 +173,7 @@ class SpaceApiClientTest {
                                   "participants": [],
                                   "branchPairs": [
                                     {
-                                      "repository": "ultimate",
+                                      "repository": "millennium-falcon",
                                       "sourceBranchInfo": {
                                         "head": "source-head"
                                       }
@@ -181,17 +181,17 @@ class SpaceApiClientTest {
                                   ],
                                   "createdBy": {
                                     "id": "author-1",
-                                    "username": "review.author",
+                                    "username": "Han.Solo",
                                     "name": {
-                                      "firstName": "Review",
-                                      "lastName": "Author"
+                                      "firstName": "Han",
+                                      "lastName": "Solo"
                                     }
                                   }
                                 }
                                 """.trimIndent(),
                             )
 
-                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705/merge-files" ->
+                        "/api/http/projects/key%3AALDERAAN/code-reviews/number%3A1138/merge-files" ->
                             respondJson(
                                 """
                                 {
@@ -199,8 +199,8 @@ class SpaceApiClientTest {
                                   "totalCount": 1,
                                   "data": [
                                     {
-                                      "name": "src/Main.kt",
-                                      "oldName": "src/App.kt",
+                                      "name": "src/Hyperdrive.kt",
+                                      "oldName": "src/NavComputer.kt",
                                       "baseId": "base-1",
                                       "sourceId": "source-blob",
                                       "targetId": "target-blob",
@@ -226,8 +226,8 @@ class SpaceApiClientTest {
 
             val response =
                 client.listReviewChanges(
-                    projectKey = "FLEET",
-                    reviewRef = "number:7705",
+                    projectKey = "ALDERAAN",
+                    reviewRef = "number:1138",
                     limit = 100,
                     offset = 0,
                 )
@@ -235,9 +235,9 @@ class SpaceApiClientTest {
 
             assertEquals("merge-request-files", response.scope)
             assertEquals(1, response.count)
-            assertEquals("ultimate", change.repository)
-            assertEquals("src/Main.kt", change.path)
-            assertEquals("src/App.kt", change.oldPath)
+            assertEquals("millennium-falcon", change.repository)
+            assertEquals("src/Hyperdrive.kt", change.path)
+            assertEquals("src/NavComputer.kt", change.oldPath)
             assertEquals("source-head", change.revision)
             assertEquals("RENAMED", change.changeType)
             assertEquals(12, change.diffSize?.added)
@@ -249,17 +249,17 @@ class SpaceApiClientTest {
             val client =
                 testClient { request ->
                     when (request.url.encodedPath) {
-                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705" ->
+                        "/api/http/projects/key%3AALDERAAN/code-reviews/number%3A1138" ->
                             respondJson(
                                 """
                                 {
                                   "className": "CommitSetReviewRecord",
                                   "id": "review-1",
                                   "project": {
-                                    "key": "FLEET"
+                                    "key": "ALDERAAN"
                                   },
-                                  "number": 7705,
-                                  "title": "Test review",
+                                  "number": 1138,
+                                  "title": "[falcon] Tune hyperdrive ignition timing",
                                   "state": "Opened",
                                   "createdAt": 1,
                                   "timestamp": 2,
@@ -267,17 +267,17 @@ class SpaceApiClientTest {
                                   "participants": [],
                                   "createdBy": {
                                     "id": "author-1",
-                                    "username": "review.author",
+                                    "username": "Han.Solo",
                                     "name": {
-                                      "firstName": "Review",
-                                      "lastName": "Author"
+                                      "firstName": "Han",
+                                      "lastName": "Solo"
                                     }
                                   }
                                 }
                                 """.trimIndent(),
                             )
 
-                        "/api/http/projects/key%3AFLEET/code-reviews/number%3A7705/files" ->
+                        "/api/http/projects/key%3AALDERAAN/code-reviews/number%3A1138/files" ->
                             respondJson(
                                 """
                                 {
@@ -285,7 +285,7 @@ class SpaceApiClientTest {
                                   "totalCount": 1,
                                   "data": [
                                     {
-                                      "repository": "ultimate",
+                                      "repository": "millennium-falcon",
                                       "change": {
                                         "changeType": "MODIFIED",
                                         "revision": "revision-1",
@@ -293,11 +293,11 @@ class SpaceApiClientTest {
                                           "added": 7,
                                           "deleted": 3
                                         },
-                                        "path": "src/Main.kt",
+                                        "path": "src/Hyperdrive.kt",
                                         "detached": false,
                                         "constituentCommits": ["c1", "c2"],
                                         "old": {
-                                          "path": "src/App.kt",
+                                          "path": "src/NavComputer.kt",
                                           "blob": "old-blob",
                                           "type": "FILE",
                                           "properties": {
@@ -306,7 +306,7 @@ class SpaceApiClientTest {
                                           }
                                         },
                                         "new": {
-                                          "path": "src/Main.kt",
+                                          "path": "src/Hyperdrive.kt",
                                           "blob": "new-blob",
                                           "type": "FILE",
                                           "properties": {
@@ -328,8 +328,8 @@ class SpaceApiClientTest {
 
             val response =
                 client.listReviewChanges(
-                    projectKey = "FLEET",
-                    reviewRef = "number:7705",
+                    projectKey = "ALDERAAN",
+                    reviewRef = "number:1138",
                     limit = 100,
                     offset = 0,
                 )
@@ -337,9 +337,9 @@ class SpaceApiClientTest {
 
             assertEquals("code-review-files", response.scope)
             assertEquals(1, response.count)
-            assertEquals("ultimate", change.repository)
-            assertEquals("src/Main.kt", change.path)
-            assertEquals("src/App.kt", change.oldPath)
+            assertEquals("millennium-falcon", change.repository)
+            assertEquals("src/Hyperdrive.kt", change.path)
+            assertEquals("src/NavComputer.kt", change.oldPath)
             assertEquals("revision-1", change.revision)
             assertEquals("MODIFIED", change.changeType)
             assertEquals(listOf("c1", "c2"), change.constituentCommits)

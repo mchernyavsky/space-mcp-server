@@ -213,8 +213,8 @@ Example response:
   "authenticated": true,
   "serverUrl": "https://jetbrains.team",
   "currentUser": {
-    "id": "3j5uoD3koYEa",
-    "username": "Mikhail.Chernyavsky"
+    "id": "hero-001",
+    "username": "Leia.Organa"
   }
 }
 ```
@@ -225,7 +225,7 @@ List your reviews:
 {
   "name": "space_list_my_reviews",
   "arguments": {
-    "projectKey": "FLEET",
+    "projectKey": "ALDERAAN",
     "role": "both",
     "limit": 20
   }
@@ -238,13 +238,13 @@ Example response:
 {
   "reviews": [
     {
-      "projectKey": "FLEET",
+      "projectKey": "ALDERAAN",
       "matchedRoles": ["reviewer"],
       "review": {
-        "number": 7705,
-        "title": "[air] WIP AIR-4493 introduce tree-like changes structure",
+        "number": 1138,
+        "title": "[falcon] Tune hyperdrive ignition timing",
         "resolvedAuthor": {
-          "username": "Aleksandr.Chernokoz"
+          "username": "Han.Solo"
         }
       }
     }
@@ -261,8 +261,8 @@ Fetch a review with commits and comments:
 {
   "name": "space_get_review",
   "arguments": {
-    "projectKey": "FLEET",
-    "review": "number:7705",
+    "projectKey": "ALDERAAN",
+    "review": "number:1138",
     "includeCommits": true,
     "includeChanges": true,
     "includeComments": true
@@ -275,22 +275,22 @@ Example response excerpt:
 ```json
 {
   "review": {
-    "number": 7705,
-    "title": "[air] WIP AIR-4493 introduce tree-like changes structure",
+    "number": 1138,
+    "title": "[falcon] Tune hyperdrive ignition timing",
     "resolvedAuthor": {
-      "username": "Aleksandr.Chernokoz"
+      "username": "Han.Solo"
     }
   },
   "commits": [
     {
       "repositoryInReview": {
-        "name": "ultimate"
+        "name": "millennium-falcon"
       },
       "commits": [
         {
-          "id": "9013469ed495a90305cb7b886b1b18c8548b09f7",
+          "id": "cafebabedeadbeef00112233445566778899aabb",
           "author": {
-            "name": "Aleksandr Chernokoz"
+            "name": "Han Solo"
           }
         }
       ]
@@ -300,8 +300,8 @@ Example response excerpt:
     "scope": "merge-request-files",
     "changes": [
       {
-        "repository": "ultimate",
-        "path": "src/Main.kt",
+        "repository": "millennium-falcon",
+        "path": "src/Hyperdrive.kt",
         "changeType": "MODIFIED",
         "revision": "source-head-sha"
       }
@@ -313,7 +313,7 @@ Example response excerpt:
         "kind": "code-discussion",
         "text": "Please rename this",
         "author": {
-          "name": "Mikhail.Chernyavsky"
+          "name": "Leia.Organa"
         }
       }
     ]
@@ -327,8 +327,8 @@ List changed files in a review:
 {
   "name": "space_list_review_changes",
   "arguments": {
-    "projectKey": "FLEET",
-    "review": "number:7705",
+    "projectKey": "ALDERAAN",
+    "review": "number:1138",
     "limit": 100
   }
 }
@@ -339,17 +339,17 @@ Example response:
 ```json
 {
   "review": {
-    "number": 7705,
-    "title": "[air] WIP AIR-4493 introduce tree-like changes structure"
+    "number": 1138,
+    "title": "[falcon] Tune hyperdrive ignition timing"
   },
   "scope": "merge-request-files",
   "count": 1,
   "changes": [
     {
       "kind": "merge-request-file",
-      "repository": "ultimate",
-      "path": "src/Main.kt",
-      "oldPath": "src/App.kt",
+      "repository": "millennium-falcon",
+      "path": "src/Hyperdrive.kt",
+      "oldPath": "src/NavComputer.kt",
       "revision": "source-head-sha",
       "changeType": "RENAMED",
       "diffSize": {
@@ -367,9 +367,9 @@ Filter review comments by author:
 {
   "name": "space_list_review_comments",
   "arguments": {
-    "projectKey": "FLEET",
-    "review": "number:7705",
-    "author": "Mikhail.Chernyavsky"
+    "projectKey": "ALDERAAN",
+    "review": "number:1138",
+    "author": "Leia.Organa"
   }
 }
 ```
@@ -378,7 +378,7 @@ Example response:
 
 ```json
 {
-  "authorFilter": "Mikhail.Chernyavsky",
+  "authorFilter": "Leia.Organa",
   "count": 2,
   "comments": [
     {
@@ -388,7 +388,7 @@ Example response:
     {
       "kind": "code-discussion",
       "anchor": {
-        "filename": "src/Main.kt",
+        "filename": "src/Hyperdrive.kt",
         "line": 42
       }
     }
