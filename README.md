@@ -64,7 +64,7 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
    In both cases, the file you want is the fat jar:
 
    ```text
-   build/libs/space-mcp-server-0.1.0-all.jar
+   build/libs/space-mcp-server-0.2.0-all.jar
    ```
 
 2. Configure your MCP host to run that jar with `java -jar`:
@@ -76,7 +76,7 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
          "command": "java",
          "args": [
            "-jar",
-           "/path/to/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
+           "/path/to/space-mcp-server/build/libs/space-mcp-server-0.2.0-all.jar"
          ],
          "env": {
            "SPACE_SERVER_URL": "https://jetbrains.team",
@@ -109,7 +109,7 @@ Kotlin MCP server for JetBrains Space code reviews and merge requests.
 The runnable fat jar is created at:
 
 ```text
-build/libs/space-mcp-server-0.1.0-all.jar
+build/libs/space-mcp-server-0.2.0-all.jar
 ```
 
 ## GitHub Workflows
@@ -127,7 +127,7 @@ build/libs/space-mcp-server-0.1.0-all.jar
 If you downloaded the release jar, run that file. If you built from source, run the jar from `build/libs`.
 
 ```bash
-java -jar build/libs/space-mcp-server-0.1.0-all.jar
+java -jar build/libs/space-mcp-server-0.2.0-all.jar
 ```
 
 The server uses stdio transport.
@@ -161,7 +161,7 @@ Example local MCP config:
       "command": "java",
       "args": [
         "-jar",
-        "/path/to/space-mcp-server/build/libs/space-mcp-server-0.1.0-all.jar"
+        "/path/to/space-mcp-server/build/libs/space-mcp-server-0.2.0-all.jar"
       ],
       "env": {
         "SPACE_SERVER_URL": "https://jetbrains.team",

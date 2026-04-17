@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.2.0 - 2026-04-17
+
+- Added normalized review file/change listing through `space_list_review_changes`
+- Added optional changed-file loading to `space_get_review`
+- Removed obsolete raw HTTP fallback and extra SDK indirection layers in favor of direct SDK-backed review operations
+- Replaced work-specific examples in docs and tests with fictional fixtures
+
 ## 0.1.0 - 2026-04-16
 
 - Initial public release of the Space MCP server
